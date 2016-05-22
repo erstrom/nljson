@@ -102,10 +102,14 @@ static json_t *parse_nl_attrs(uint8_t *buf, size_t buflen, nljson_t *hdl)
 			data_type = policy[type].type;
 		cur_attr_obj = create_attr_object(cur_attr, data_type);
 		if (cur_attr_obj) {
-			if (attr_type_to_str_map && attr_type_to_str_map[type])
-				json_object_set(obj, attr_type_to_str_map[type], cur_attr_obj);
-			else
-				json_object_set(obj, "UNKNOWN_ATTR", cur_attr_obj);
+			if (attr_type_to_str_map && attr_type_to_str_map[type]) {
+				json_object_set(obj, attr_type_to_str_map[type],
+						cur_attr_obj);
+			} else {
+				char tmp[20];
+				snprintf(tmp, sizeof(tmp), "UNKNOWN_ATTR_%d", type);
+				json_object_set(obj, tmp, cur_attr_obj);
+			}
 			json_decref(cur_attr_obj);
 		}
 		cur_attr = nla_next(cur_attr, &remaining);

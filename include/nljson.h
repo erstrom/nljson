@@ -31,8 +31,9 @@ typedef struct _nljson nljson_t;
  * @arg policy_json       The nla policy definition string.
  *                        Must be a valid JSON string.
  *                        If NULL, no policy will be created and
- *                        all decoded attributes will be set to
- *                        UNKNOWN_ATTR with data_type NLA_UNSPEC
+ *                        all decoded attributes will have the value
+ *                        set to UNKNOWN_ATTR_<attr_type> and data_type
+ *                        set to NLA_UNSPEC.
  */
 int nljson_init(nljson_t **hdl,
 		uint32_t json_format_flags,
@@ -50,6 +51,10 @@ int nljson_init(nljson_t **hdl,
  *
  * @arg policy_file       The path to a nla policy definition file.
  *                        The path must point to a valid JSON file.
+ *                        If NULL, no policy will be created and
+ *                        all decoded attributes will have the value
+ *                        set to UNKNOWN_ATTR_<attr_type> and data_type
+ *                        set to NLA_UNSPEC.
  */
 int nljson_init_file(nljson_t **hdl,
 		     uint32_t json_format_flags,
@@ -71,6 +76,10 @@ int nljson_init_file(nljson_t **hdl,
  *                        The callback is expected to fill buf with
  *                        at most size bytes and return the number
  *                        of bytes written.
+ *                        If NULL, no policy will be created and
+ *                        all decoded attributes will have the value
+ *                        set to UNKNOWN_ATTR_<attr_type> and data_type
+ *                        set to NLA_UNSPEC.
  * @arg cb_data           pointer that will passed to read_policy_cb.
  */
 int nljson_init_cb(nljson_t **hdl,
@@ -94,8 +103,8 @@ void nljson_deinit(nljson_t **hdl);
  * init step.
  *
  * If the handle (hdl) is NULL (no nljson_init function has been called)
- * all decoded attributes will be set to UNKNOWN_ATTR with data_type
- * NLA_UNSPEC
+ * all decoded attributes will have the value set to UNKNOWN_ATTR_<attr_type>
+ * and data_type set to NLA_UNSPEC
  */
 
 /**
@@ -106,8 +115,9 @@ void nljson_deinit(nljson_t **hdl);
  *                        of the init functions.
  *                        The handle holds the nla policy used when
  *                        parsing nla_stream.
- *                        If NULL, all decoded attributes will be set to
- *                        UNKNOWN_ATTR with data_type NLA_UNSPEC
+ *                        If NULL, all decoded attributes will have the
+ *                        value set to UNKNOWN_ATTR_<attr_type> and
+ *                        data_type set to NLA_UNSPEC
  *
  * @arg nla_stream        Stream of bytes containing netlink attributes
  *
@@ -147,8 +157,9 @@ int nljson_encode_nla(nljson_t *hdl,
  *                        of the init functions.
  *                        The handle holds the nla policy used when
  *                        parsing nla_stream.
- *                        If NULL, all decoded attributes will be set to
- *                        UNKNOWN_ATTR with data_type NLA_UNSPEC
+ *                        If NULL, all decoded attributes will have the
+ *                        value set to UNKNOWN_ATTR_<attr_type> and
+ *                        data_type set to NLA_UNSPEC
  *
  * @arg nla_stream        Stream of bytes containing netlink attributes
  *
@@ -179,8 +190,9 @@ char *nljson_encode_nla_alloc(nljson_t *hdl,
  *                        of the init functions.
  *                        The handle holds the nla policy used when
  *                        parsing nla_stream.
- *                        If NULL, all decoded attributes will be set to
- *                        UNKNOWN_ATTR with data_type NLA_UNSPEC
+ *                        If NULL, all decoded attributes will have the
+ *                        value set to UNKNOWN_ATTR_<attr_type> and
+ *                        data_type set to NLA_UNSPEC
  *
  * @arg nla_stream        Stream of bytes containing netlink attributes
  *
