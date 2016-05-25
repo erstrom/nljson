@@ -14,6 +14,7 @@ set(NLJSON_TOOLS_VERSION "0.1")
 #
 option(NLJSON_BUILD_SHARED_LIB "Build shared library." ON)
 option(NLJSON_BUILD_ENCODER "Build encoder program." ON)
+option(NLJSON_BUILD_DECODER "Build decoder program." ON)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
@@ -74,6 +75,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/include ${CMAKE_CURRENT_BINARY_D
 
 set(NLJSON_LIB_SRC src/lib/nljson.c src/lib/nljson_encode.c src/lib/nljson_decode.c)
 set(NLJSON_ENCODER_SRC src/tools/nljson-encoder.c)
+set(NLJSON_DECODER_SRC src/tools/nljson-decoder.c)
 set(NLJSON_HDR_PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include/nljson.h)
 
 if(NLJSON_BUILD_SHARED_LIB)
@@ -98,6 +100,13 @@ if (NLJSON_BUILD_ENCODER)
 	               ${NLJSON_ENCODER_SRC}
 	               ${NLJSON_HDR_PUBLIC})
 	target_link_libraries(nljson-encoder nljson)
+endif()
+
+if (NLJSON_BUILD_DECODER)
+	add_executable(nljson-decoder
+	               ${NLJSON_DECODER_SRC}
+	               ${NLJSON_HDR_PUBLIC})
+	target_link_libraries(nljson-decoder nljson)
 endif()
 
 if (CMAKE_COMPILER_IS_GNUCC)
@@ -133,6 +142,11 @@ install(TARGETS nljson
 
 if (NLJSON_BUILD_ENCODER)
 	install(TARGETS nljson-encoder
+	        RUNTIME DESTINATION "${NLJSON_INSTALL_BIN_DIR}" COMPONENT bin)
+endif()
+
+if (NLJSON_BUILD_DECODER)
+	install(TARGETS nljson-decoder
 	        RUNTIME DESTINATION "${NLJSON_INSTALL_BIN_DIR}" COMPONENT bin)
 endif()
 
