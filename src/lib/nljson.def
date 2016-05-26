@@ -5,5 +5,8 @@ EXPORTS
 	nljson_encode_nla
 	nljson_encode_nla_alloc
 	nljson_encode_nla_cb
+	nljson_decode_nla
+	nljson_decode_nla_alloc
+	nljson_decode_nla_cb
 	nljson_deinit
 

@@ -218,5 +218,93 @@ int nljson_encode_nla_cb(nljson_t *hdl,
 			 void *cb_data,
 			 uint32_t json_format_flags);
 
+/**
+ * Decode family of functions.
+ *
+ * These functions will decode JSON encoded netlink attributes into
+ * a stream of binary data. The binary data stream (nla_stream) can be
+ * written directly into an nlmsg.
+ */
+
+/**
+ * Decodes a JSON encoded string of nl attributes into the byte stream
+ * nla_stream. nla_stream is a continuous stream of nl attributes that
+ * can be written directly into an nlmsg.
+ *
+ * @arg input             JSON encoded input string.
+ *
+ * @arg input_len         Length of the input string.
+ *
+ * @arg nla_stream        Output: stream of bytes containing netlink attributes
+ *
+ * @arg nla_stream_len    The length of the output buffer.
+ *
+ * @arg bytes_consumed    The number of bytes read (consumed) from
+ *                        input.
+ *
+ * @arg bytes_produced    The number of output bytes produced, i.e. the
+ *                        length of the nla_stream.
+ *
+ * @arg json_decode_flags Flags for the JSON input parsing.
+ *                        Passed directly to the jansson library.
+ *                        See jansson documentation for more info.
+ */
+int nljson_decode_nla(const char *input,
+		      void *nla_stream,
+		      size_t nla_stream_buf_len,
+		      size_t *bytes_consumed,
+		      size_t *bytes_produced,
+		      uint32_t json_decode_flags);
+
+/**
+ * Similar to nljson_decode_nla but the output buffer is allocated
+ * by the function and returned to the caller.
+ * The caller is responsible for deallocating the buffer.
+ * In case of error, NULL will be returned.
+ *
+ * @arg input             JSON encoded input string.
+ *
+ * @arg input_len         Length of the input string.
+ *
+ * @arg bytes_consumed    The number of bytes read (consumed) from
+ *                        input.
+ *
+ * @arg bytes_produced    The number of output bytes produced, i.e. the
+ *                        length of the nla_stream.
+ *
+ * @arg json_decode_flags Flags for the JSON input parsing.
+ *                        Passed directly to the jansson library.
+ *                        See jansson documentation for more info.
+ */
+void *nljson_decode_nla_alloc(const char *input,
+			      size_t *bytes_consumed,
+			      size_t *bytes_produced,
+			      uint32_t json_decode_flags);
+
+
+/**
+ * Similar to nljson_decode_nla but the output is passed (in chunks)
+ * to the callback decode_cb.
+ *
+ * @arg input             JSON encoded input string.
+ *
+ * @arg input_len         Length of the input string.
+ *
+ * @arg bytes_consumed    The number of bytes read (consumed) from
+ *                        input.
+ *
+ * @arg decode_cb         will be called continuously when writing
+ *                        the decoded nla output stream.
+ *
+ * @arg json_decode_flags Flags for the JSON input parsing.
+ *                        Passed directly to the jansson library.
+ *                        See jansson documentation for more info.
+ */
+int nljson_decode_nla_cb(const char *input,
+			 size_t *bytes_consumed,
+			 int (*decode_cb)(const void *buf, size_t size, void *data),
+			 void *cb_data,
+			 uint32_t json_decode_flags);
+
 #endif
 

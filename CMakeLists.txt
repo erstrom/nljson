@@ -72,7 +72,7 @@ file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/include/nljson.h
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/include ${CMAKE_CURRENT_BINARY_DIR}/src)
 
-set(NLJSON_LIB_SRC src/lib/nljson.c src/lib/nljson_encode.c)
+set(NLJSON_LIB_SRC src/lib/nljson.c src/lib/nljson_encode.c src/lib/nljson_decode.c)
 set(NLJSON_ENCODER_SRC src/tools/nljson-encoder.c)
 set(NLJSON_HDR_PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include/nljson.h)
 
