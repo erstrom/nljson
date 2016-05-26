@@ -70,7 +70,7 @@ int nljson_init_file(nljson_t **hdl,
  *                        nla policy.
  *                        Passed directly to the jansson library.
  *                        See jansson documentation for more info.
- * @arg read_policy_cb    will be called continuosly by nljson_init
+ * @arg read_policy_cb    will be called continuously by nljson_init
  *                        when reading the JSON encoded nla policy
  *                        definition.
  *                        The callback is expected to fill buf with
@@ -121,7 +121,7 @@ void nljson_deinit(nljson_t **hdl);
  *
  * @arg nla_stream        Stream of bytes containing netlink attributes
  *
- * @arg nla_stream_len    The length of the netlink attribute bytestream.
+ * @arg nla_stream_len    The length of the netlink attribute byte stream.
  *
  * @arg output            The output buffer the encoded JSON string will
  *                        be written to.
@@ -163,7 +163,7 @@ int nljson_encode_nla(nljson_t *hdl,
  *
  * @arg nla_stream        Stream of bytes containing netlink attributes
  *
- * @arg nla_stream_len    The length of the netlink attribute bytestream.
+ * @arg nla_stream_len    The length of the netlink attribute byte stream.
  *
  * @arg bytes_consumed    The number of bytes read (consumed) from
  *                        nla_stream.
@@ -196,12 +196,12 @@ char *nljson_encode_nla_alloc(nljson_t *hdl,
  *
  * @arg nla_stream        Stream of bytes containing netlink attributes
  *
- * @arg nla_stream_len    The length of the netlink attribute bytestream.
+ * @arg nla_stream_len    The length of the netlink attribute byte stream.
  *
  * @arg bytes_consumed    The number of bytes read (consumed) from
  *                        nla_stream.
  *
- * @arg encode_cb         will be called continously when writing
+ * @arg encode_cb         will be called continuously when writing
  *                        the JSON encoded nla output.
  *
  * @arg cb_data           pointer that will passed to encode_cb.
