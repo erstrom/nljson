@@ -24,6 +24,8 @@
 #define VALUE_STR "value"
 #define VALUE_STR_LEN (sizeof(VALUE_STR) - 1)
 
+#define NLA_HDR_LEN 4
+
 struct _nljson {
 	struct nla_policy *policy;
 	size_t policy_len;

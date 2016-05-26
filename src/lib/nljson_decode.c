@@ -7,8 +7,6 @@
 #define STR_MATCH(str, fixed_str) \
 (strncmp(str, fixed_str, strlen(fixed_str)) == 0)
 
-#define NLA_HDR_LEN 4
-
 struct nlattr_list_item {
 	struct nlattr_list_item *next;
 	struct nlattr *attr;
