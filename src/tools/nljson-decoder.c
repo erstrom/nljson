@@ -11,13 +11,23 @@
 #include <fcntl.h>
 #include <errno.h>
 
+#define IN_BUF_LEN (1024)
+#define OUT_BUF_LEN (1024)
+#define ASCII_BUF_LEN (3 * OUT_BUF_LEN + 1)
+
 static char input_file[256];
 static char output_file[256];
+
+static char in_buf[IN_BUF_LEN], ascii_buf[ASCII_BUF_LEN];
+static uint8_t out_buf[OUT_BUF_LEN];
+
+static uint32_t json_format_flags;
+static bool input_file_set, output_file_set, ascii_output;
 
 static void print_usage(const char *argv0)
 {
 	fprintf(stderr, "Usage:\n");
-	fprintf(stderr, "%s [ -i | --input input_file ] ( -o | --output output_file ) ( -f | --flags json_flags )\n", argv0);
+	fprintf(stderr, "%s [ -i | --input input_file ] ( -o | --output output_file ) ( -f | --flags json_flags ) ( -a | --ascii )\n", argv0);
 	fprintf(stderr, "Options:\n");
 	fprintf(stderr, "  -f, --flags              format flags for the JSON decoder.\n");
 	fprintf(stderr, "                           See jansson library documentation for more details.\n");
@@ -25,15 +35,30 @@ static void print_usage(const char *argv0)
 	fprintf(stderr, "                           If omitted, the JSON input will be read from stdin.\n");
 	fprintf(stderr, "  -o, --output             netlink attribute output stream.\n");
 	fprintf(stderr, "                           If omitted, the nla byte stream will be written to stdout.\n");
+	fprintf(stderr, "  -a, --ascii              ASCII output. Print output in ASCII format.\n");
 
 }
 
-static void do_decode(bool input_file_set, bool output_file_set,
-		      uint32_t json_format_flags)
+static int write_ascii(int fd, const uint8_t *buf, size_t len)
+{
+	size_t i;
+	int n = 0, write_ret;
+
+	for (i = 0; i < len; i++)
+		n += snprintf(ascii_buf + n, sizeof(ascii_buf) - n, "%02X ",
+			      buf[i]);
+	n += snprintf(ascii_buf + n, sizeof(ascii_buf) - n, "\n");
+
+	write_ret = write(fd, ascii_buf, n);
+	if (write_ret != n)
+		return 0;
+	else
+		return len;
+}
+
+static void do_decode(void)
 {
 	int rc = 0, in_fd, out_fd;
-	char in_buf[1024];
-	uint8_t out_buf[1024];
 	size_t in_buf_offset = 0;
 
 	if (input_file_set)
@@ -60,7 +85,7 @@ static void do_decode(bool input_file_set, bool output_file_set,
 	 */
 	for (;;) {
 		ssize_t read_len, write_len;
-		size_t bytes_consumed, bytes_produced;
+		size_t consumed, produced;
 
 		read_len = read(in_fd, in_buf + in_buf_offset,
 				sizeof(in_buf) - in_buf_offset);
@@ -70,20 +95,25 @@ static void do_decode(bool input_file_set, bool output_file_set,
 		while (read_len > 0) {
 			rc = nljson_decode_nla(in_buf, out_buf,
 					       sizeof(out_buf),
-					       &bytes_consumed, &bytes_produced,
+					       &consumed, &produced,
 					       json_format_flags);
-			if (rc || (bytes_produced == 0))
+			if (rc || (produced == 0) || (consumed == 0))
 				break;
-			write_len = write(out_fd, out_buf, bytes_produced);
-			if (write_len != bytes_produced)
+			if (ascii_output)
+				write_len = write_ascii(out_fd, out_buf,
+							produced);
+			else
+				write_len = write(out_fd, out_buf, produced);
+			if ((size_t) write_len != produced)
 				break;
-			if (bytes_consumed < read_len) {
-				in_buf_offset = read_len - bytes_consumed;
-				memmove(in_buf, in_buf + bytes_consumed, in_buf_offset);
+			if (consumed < (size_t) read_len) {
+				in_buf_offset = read_len - consumed;
+				memmove(in_buf, in_buf + consumed,
+					in_buf_offset);
 			} else {
 				in_buf_offset = 0;
 			}
-			read_len -= bytes_consumed;
+			read_len -= consumed;
 		}
 	}
 out:
@@ -96,18 +126,17 @@ out:
 int main(int argc, char *argv[])
 {
 	int opt, optind = 0;
-	uint32_t json_format_flags = 0;
 	char *tmp;
-	bool input_file_set = false, output_file_set = false;
 	struct option long_opts[] = {
 		{"help", no_argument, 0, 'h'},
 		{"flags", required_argument, 0, 'f'},
 		{"input", required_argument, 0, 'i'},
 		{"output", required_argument, 0, 'o'},
+		{"ascii", no_argument, 0, 'a'},
 		{NULL, 0, 0, 0},
 	};
 
-	while ((opt = getopt_long(argc, argv, "hf:i:o:", long_opts, &optind)) != -1) {
+	while ((opt = getopt_long(argc, argv, "hf:i:o:a", long_opts, &optind)) != -1) {
 		switch (opt) {
 		case 'f':
 			json_format_flags = strtoul(optarg, &tmp, 0);
@@ -125,6 +154,9 @@ int main(int argc, char *argv[])
 			strncpy(output_file, optarg, sizeof(output_file));
 			output_file_set = true;
 			break;
+		case 'a':
+			ascii_output = true;
+			break;
 		case 'h':
 		default:
 			print_usage(argv[0]);
@@ -132,7 +164,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	do_decode(input_file_set, output_file_set, json_format_flags);
+	do_decode();
 	return 0;
 }
 
