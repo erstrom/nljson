@@ -95,12 +95,10 @@ static int populate_attr(void *attr_buf, size_t attr_len, int attr_type,
 
 	switch (attr_json_type) {
 	case JSON_TYPE_INTEGER:
-		memcpy(attr_buf + sizeof(struct nlattr), &attr_value.integer,
-		       attr_data_len);
+		memcpy(attr_buf_u8, &attr_value.integer, attr_data_len);
 		break;
 	case JSON_TYPE_STRING:
-		memcpy(attr_buf + sizeof(struct nlattr), &attr_value.str,
-		       attr_data_len);
+		memcpy(attr_buf_u8, attr_value.str, attr_data_len);
 		break;
 	case JSON_TYPE_ARRAY:
 		json_array_foreach(attr_value.array, a_index, a_value) {
