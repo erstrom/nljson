@@ -167,7 +167,7 @@ static struct nlattr *parse_json_attr(json_t *attr_json, size_t *attr_len)
 		return NULL;
 
 	*attr_len = attr_data_len + NLA_HDR_LEN;
-	attr_buf = calloc(1, *attr_len);
+	attr_buf = calloc(1, NLA_ALIGN(*attr_len));
 	if (!attr_buf)
 		return NULL;
 
@@ -216,7 +216,7 @@ static void populate_nla_stream_and_free_attr_list(struct nlattr_list_item *head
 		struct nlattr_list_item *tmp;
 
 		if (iter->attr) {
-			cur_len = nla_len(iter->attr) + NLA_HDR_LEN;
+			cur_len = NLA_ALIGN(nla_len(iter->attr) + NLA_HDR_LEN);
 			if (decode_cb) {
 				decode_cb(iter->attr, cur_len, cb_data);
 			} else {
@@ -254,7 +254,7 @@ static struct nlattr_list_item *create_attr_list(json_t *attrs_json,
 		if (!cur_attr)
 			goto err;
 
-		*tot_attr_len += cur_attr_len;
+		*tot_attr_len += NLA_ALIGN(cur_attr_len);
 		cur_item = calloc(sizeof(struct nlattr_list_item), 1);
 		cur_item->attr = cur_attr;
 		prev_item->next = cur_item;
