@@ -158,6 +158,11 @@ int nljson_encode_nla(nljson_t *hdl,
 		.output_len = output_len,
 	};
 
+	/*We add JSON_PRESERVE_ORDER in order to make sure the encoded
+	 *attributes are written in the same order as in nla_stream.
+	 */
+	json_format_flags |= JSON_PRESERVE_ORDER;
+
 	obj = parse_nl_attrs((uint8_t *) nla_stream, nla_stream_len, hdl,
 			     bytes_consumed);
 	if (!obj)
@@ -180,6 +185,11 @@ char *nljson_encode_nla_alloc(nljson_t *hdl,
 	json_t *obj;
 	char *output;
 
+	/*We add JSON_PRESERVE_ORDER in order to make sure the encoded
+	 *attributes are written in the same order as in nla_stream.
+	 */
+	json_format_flags |= JSON_PRESERVE_ORDER;
+
 	obj = parse_nl_attrs((uint8_t *) nla_stream, nla_stream_len, hdl,
 			     bytes_consumed);
 	if (!obj)
@@ -201,6 +211,11 @@ int nljson_encode_nla_cb(nljson_t *hdl,
 {
 	json_t *obj;
 	int rc;
+
+	/*We add JSON_PRESERVE_ORDER in order to make sure the encoded
+	 *attributes are written in the same order as in nla_stream.
+	 */
+	json_format_flags |= JSON_PRESERVE_ORDER;
 
 	if (!encode_cb)
 		return -EINVAL;
