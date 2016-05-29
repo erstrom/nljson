@@ -21,7 +21,7 @@ enum json_type {
 union attr_value {
 	const char *str;
 	json_t *array;
-	int integer;
+	nljson_int_t integer;
 };
 
 static int attr_type_lengths[NLA_TYPE_MAX + 1] = {
