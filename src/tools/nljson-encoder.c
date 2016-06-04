@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <nljson_tools_config.h>
 
 #define IN_BUF_LEN (1024)
 #define OUT_BUF_LEN (1024)
@@ -38,7 +39,17 @@ static void print_usage(const char *argv0)
 	fprintf(stderr, "                           If omitted, the nla byte stream will be read from stdin.\n");
 	fprintf(stderr, "  -o, --output             JSON encoded output stream.\n");
 	fprintf(stderr, "                           If omitted, the JSON output will be written to stdout.\n");
+	fprintf(stderr, "  -version                 Print version info and exit.\n");
+}
 
+static void print_version(const char *argv0)
+{
+	fprintf(stderr, "%s version:\n", argv0);
+#if GIT_SHA_AVAILABLE
+	fprintf(stderr, "%s-%s\n", VERSION, GIT_SHA);
+#else
+	fprintf(stderr, "%s-\n", VERSION);
+#endif
 }
 
 static void do_encode(void)
@@ -122,6 +133,7 @@ int main(int argc, char *argv[])
 		{"flags", required_argument, 0, 'f'},
 		{"input", required_argument, 0, 'i'},
 		{"output", required_argument, 0, 'o'},
+		{"version", no_argument, 0, 1000},
 		{NULL, 0, 0, 0},
 	};
 
@@ -147,6 +159,9 @@ int main(int argc, char *argv[])
 			strncpy(output_file, optarg, sizeof(output_file));
 			output_file_set = true;
 			break;
+		case 1000:
+			print_version(argv[0]);
+			return 0;
 		case 'h':
 		default:
 			print_usage(argv[0]);

@@ -93,8 +93,27 @@ endif()
 # Prepare build / define targets
 #
 
+set(GIT_SHA_AVAILABLE 0)
+find_program(GIT git)
+
+if (GIT)
+	execute_process(
+		COMMAND ${GIT} log -1 --format=%h
+		WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+		RESULT_VARIABLE GIT_CMD_RESULT
+		OUTPUT_VARIABLE GIT_COMMIT_HASH
+		OUTPUT_STRIP_TRAILING_WHITESPACE
+	)
+	if (NOT GIT_CMD_RESULT)
+		set(GIT_SHA_AVAILABLE 1)
+	endif()
+endif()
+
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/lib/nljson_config.h.in
                ${CMAKE_CURRENT_BINARY_DIR}/include/nljson_config.h)
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/tools/nljson_tools_config.h.in
+               ${CMAKE_CURRENT_BINARY_DIR}/include/nljson_tools_config.h)
 
 # Copy the nljson.h file to the build dir
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/include/nljson.h

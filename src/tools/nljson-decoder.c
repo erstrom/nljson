@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <nljson_tools_config.h>
 
 #define IN_BUF_LEN (1024)
 #define OUT_BUF_LEN (1024)
@@ -27,7 +28,7 @@ static bool input_file_set, output_file_set, ascii_output;
 static void print_usage(const char *argv0)
 {
 	fprintf(stderr, "Usage:\n");
-	fprintf(stderr, "%s [ -i | --input input_file ] ( -o | --output output_file ) ( -f | --flags json_flags ) ( -a | --ascii )\n", argv0);
+	fprintf(stderr, "%s [ -i | --input input_file ] [ -o | --output output_file ] [ -f | --flags json_flags  [ -a | --ascii ] [ --version ]\n", argv0);
 	fprintf(stderr, "Options:\n");
 	fprintf(stderr, "  -f, --flags              format flags for the JSON decoder.\n");
 	fprintf(stderr, "                           See jansson library documentation for more details.\n");
@@ -36,7 +37,18 @@ static void print_usage(const char *argv0)
 	fprintf(stderr, "  -o, --output             netlink attribute output stream.\n");
 	fprintf(stderr, "                           If omitted, the nla byte stream will be written to stdout.\n");
 	fprintf(stderr, "  -a, --ascii              ASCII output. Print output in ASCII format.\n");
+	fprintf(stderr, "  -version                 Print version info and exit.\n");
 
+}
+
+static void print_version(const char *argv0)
+{
+	fprintf(stderr, "%s version:\n", argv0);
+#if GIT_SHA_AVAILABLE
+	fprintf(stderr, "%s-%s\n", VERSION, GIT_SHA);
+#else
+	fprintf(stderr, "%s-\n", VERSION);
+#endif
 }
 
 static int write_ascii(int fd, const uint8_t *buf, size_t len)
@@ -133,6 +145,7 @@ int main(int argc, char *argv[])
 		{"input", required_argument, 0, 'i'},
 		{"output", required_argument, 0, 'o'},
 		{"ascii", no_argument, 0, 'a'},
+		{"version", no_argument, 0, 1000},
 		{NULL, 0, 0, 0},
 	};
 
@@ -157,6 +170,9 @@ int main(int argc, char *argv[])
 		case 'a':
 			ascii_output = true;
 			break;
+		case 1000:
+			print_version(argv[0]);
+			return 0;
 		case 'h':
 		default:
 			print_usage(argv[0]);
