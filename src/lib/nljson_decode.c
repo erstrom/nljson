@@ -286,7 +286,9 @@ err:
 }
 
 static int parse_json_attrs_cb(json_t *attrs_json,
-			       int (*decode_cb)(const void *buf, size_t size, void *data),
+			       int (*decode_cb)(const void *buf,
+						size_t size,
+						void *data),
 			       void *cb_data)
 {
 	size_t tot_attr_len;
@@ -413,7 +415,9 @@ err:
 
 int nljson_decode_nla_cb(const char *input,
 			 size_t *bytes_consumed,
-			 int (*decode_cb)(const void *buf, size_t size, void *data),
+			 int (*decode_cb)(const void *buf,
+					  size_t size,
+					  void *data),
 			 void *cb_data,
 			 uint32_t json_decode_flags)
 {

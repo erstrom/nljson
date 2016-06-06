@@ -232,7 +232,9 @@ int nljson_encode_nla_cb(nljson_t *hdl,
 			 const void *nla_stream,
 			 size_t nla_stream_len,
 			 size_t *bytes_consumed,
-			 int (*encode_cb)(const char *buf, size_t size, void *data),
+			 int (*encode_cb)(const char *buf,
+					  size_t size,
+					  void *data),
 			 void *cb_data,
 			 uint32_t json_format_flags);
 
@@ -320,7 +322,9 @@ void *nljson_decode_nla_alloc(const char *input,
  */
 int nljson_decode_nla_cb(const char *input,
 			 size_t *bytes_consumed,
-			 int (*decode_cb)(const void *buf, size_t size, void *data),
+			 int (*decode_cb)(const void *buf,
+					  size_t size,
+					  void *data),
 			 void *cb_data,
 			 uint32_t json_decode_flags);
 

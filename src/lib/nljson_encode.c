@@ -223,7 +223,9 @@ int nljson_encode_nla_cb(nljson_t *hdl,
 			 const void *nla_stream,
 			 size_t nla_stream_len,
 			 size_t *bytes_consumed,
-			 int (*encode_cb)(const char *buf, size_t size, void *data),
+			 int (*encode_cb)(const char *buf,
+					  size_t size,
+					  void *data),
 			 void *cb_data,
 			 uint32_t json_format_flags)
 {
