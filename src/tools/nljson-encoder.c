@@ -47,26 +47,34 @@ static bool policy_file_set, input_file_set, output_file_set;
 static void print_usage(const char *argv0)
 {
 	fprintf(stderr, "Usage:\n");
-	fprintf(stderr, "%s [ -p | --policy policy_file ] [ -i | --input input_file ] ( -o | --output output_file ) ( -f | --flags json_flags )\n", argv0);
+	fprintf(stderr, "%s OPTIONS\n", argv0);
+	fprintf(stderr, "\n");
+	fprintf(stderr, "nljson-encoder reads a stream of netlink attributes from stdin\n");
+	fprintf(stderr, "or an input file and encodes it into a JSON representation.\n");
+	fprintf(stderr, "The JSON output is written to stdout or a file\n");
+	fprintf(stderr, "\n");
+	fprintf(stderr, "A policy definition can be provided, but is not necessary.\n");
+	fprintf(stderr, "\n");
 	fprintf(stderr, "Options:\n");
-	fprintf(stderr, "  -p, --policy             netlink attribute policy file in JSON format.\n");
-	fprintf(stderr, "                           If omitted, the encoded JSON nla output will have all attributes set as NLA_UNSPEC.\n");
-	fprintf(stderr, "  -f, --flags              format flags for the JSON encoded output.\n");
-	fprintf(stderr, "                           See jansson library documentation for more details.\n");
-	fprintf(stderr, "  -i, --input              netlink attribute input file.\n");
-	fprintf(stderr, "                           If omitted, the nla byte stream will be read from stdin.\n");
-	fprintf(stderr, "  -o, --output             JSON encoded output stream.\n");
-	fprintf(stderr, "                           If omitted, the JSON output will be written to stdout.\n");
-	fprintf(stderr, "  -version                 Print version info and exit.\n");
+	fprintf(stderr, "  -p, --policy     netlink attribute policy file in JSON format.\n");
+	fprintf(stderr, "                   If omitted, the encoded JSON nla output will .\n");
+	fprintf(stderr, "                   have all attributes set as NLA_UNSPEC\n");
+	fprintf(stderr, "  -f, --flags      format flags for the JSON encoded output.\n");
+	fprintf(stderr, "                   See jansson library documentation for more details.\n");
+	fprintf(stderr, "  -i, --input      netlink attribute input file.\n");
+	fprintf(stderr, "                   If omitted, the nla byte stream will be read from stdin.\n");
+	fprintf(stderr, "  -o, --output     JSON encoded output stream.\n");
+	fprintf(stderr, "                   If omitted, the JSON output will be written to stdout.\n");
+	fprintf(stderr, "  --version        Print version info and exit.\n");
+	fprintf(stderr, "\n");
 }
 
-static void print_version(const char *argv0)
+static void print_version(void)
 {
-	fprintf(stderr, "%s version:\n", argv0);
 #if GIT_SHA_AVAILABLE
-	fprintf(stderr, "%s-%s\n", VERSION, GIT_SHA);
+	fprintf(stderr, "\n%s-%s\n\n", VERSION, GIT_SHA);
 #else
-	fprintf(stderr, "%s-\n", VERSION);
+	fprintf(stderr, "\n%s-\n\n", VERSION);
 #endif
 }
 
@@ -178,7 +186,7 @@ int main(int argc, char *argv[])
 			output_file_set = true;
 			break;
 		case 1000:
-			print_version(argv[0]);
+			print_version();
 			return 0;
 		case 'h':
 		default:

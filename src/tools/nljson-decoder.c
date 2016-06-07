@@ -46,26 +46,32 @@ static bool input_file_set, output_file_set, ascii_output;
 static void print_usage(const char *argv0)
 {
 	fprintf(stderr, "Usage:\n");
-	fprintf(stderr, "%s [ -i | --input input_file ] [ -o | --output output_file ] [ -f | --flags json_flags  [ -a | --ascii ] [ --version ]\n", argv0);
+	fprintf(stderr, "%s OPTIONS\n", argv0);
+	fprintf(stderr, "\n");
+	fprintf(stderr, "nljson-decoder reads JSON encoded netlink attributes from\n");
+	fprintf(stderr, "stdin or an input file and decodes it into a stream of netlink\n");
+	fprintf(stderr, "attributes (nla stream). The decoded output is written to stdout \n");
+	fprintf(stderr, "or a file.\n");
+	fprintf(stderr, "\n");
 	fprintf(stderr, "Options:\n");
-	fprintf(stderr, "  -f, --flags              format flags for the JSON decoder.\n");
-	fprintf(stderr, "                           See jansson library documentation for more details.\n");
-	fprintf(stderr, "  -i, --input              JSON encoded input file.\n");
-	fprintf(stderr, "                           If omitted, the JSON input will be read from stdin.\n");
-	fprintf(stderr, "  -o, --output             netlink attribute output stream.\n");
-	fprintf(stderr, "                           If omitted, the nla byte stream will be written to stdout.\n");
-	fprintf(stderr, "  -a, --ascii              ASCII output. Print output in ASCII format.\n");
-	fprintf(stderr, "  -version                 Print version info and exit.\n");
+	fprintf(stderr, "  -f, --flags      format flags for the JSON decoder.\n");
+	fprintf(stderr, "                   See jansson library documentation for more details.\n");
+	fprintf(stderr, "  -i, --input      JSON encoded input file.\n");
+	fprintf(stderr, "                   If omitted, the JSON input will be read from stdin.\n");
+	fprintf(stderr, "  -o, --output     netlink attribute output stream.\n");
+	fprintf(stderr, "                   If omitted, the nla byte stream will be written to stdout.\n");
+	fprintf(stderr, "  -a, --ascii      ASCII output. Print output in ASCII format.\n");
+	fprintf(stderr, "  --version        Print version info and exit.\n");
+	fprintf(stderr, "\n");
 
 }
 
-static void print_version(const char *argv0)
+static void print_version(void)
 {
-	fprintf(stderr, "%s version:\n", argv0);
 #if GIT_SHA_AVAILABLE
-	fprintf(stderr, "%s-%s\n", VERSION, GIT_SHA);
+	fprintf(stderr, "\n%s-%s\n\n", VERSION, GIT_SHA);
 #else
-	fprintf(stderr, "%s-\n", VERSION);
+	fprintf(stderr, "\n%s-\n\n", VERSION);
 #endif
 }
 
@@ -189,7 +195,7 @@ int main(int argc, char *argv[])
 			ascii_output = true;
 			break;
 		case 1000:
-			print_version(argv[0]);
+			print_version();
 			return 0;
 		case 'h':
 		default:
