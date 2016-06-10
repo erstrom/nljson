@@ -25,6 +25,10 @@ struct local_encode_cb_data {
 	size_t bytes_consumed;
 };
 
+static json_t *parse_nl_attrs(uint8_t *buf, size_t buflen,
+			      struct nljson_nla_policy *nljson_policy,
+			      size_t *bytes_consumed);
+
 static json_t *create_unspec_attr_object(const uint8_t *data, size_t data_len)
 {
 	unsigned int i;
@@ -40,7 +44,8 @@ static json_t *create_unspec_attr_object(const uint8_t *data, size_t data_len)
 	return obj;
 }
 
-static json_t *create_attr_object(struct nlattr *attr, int data_type)
+static json_t *create_attr_object(struct nlattr *attr, int data_type,
+				  struct nljson_nla_policy *policy)
 {
 	json_t *obj;
 	union {
@@ -82,14 +87,31 @@ static json_t *create_attr_object(struct nlattr *attr, int data_type)
 		json_object_set_new(obj, VALUE_STR, json_string_nocheck(data.str));
 		break;
 	case NLA_NESTED:
+	{
+		json_t *nested;
+		size_t bytes_consumed;
+
+		nested = parse_nl_attrs(nla_data(attr), nla_len(attr),
+					policy,
+					&bytes_consumed);
+		if (!nested || (bytes_consumed != (size_t) nla_len(attr)))
+			goto err;
+
+		json_object_set_new(obj, VALUE_STR, nested);
+		break;
+	}
 	case NLA_UNSPEC:
 	/*Fallthrough*/
 	default:
+	{
+		json_t *unspec;
+
 		data.unspec = nla_data(attr);
-		json_object_set_new(obj, VALUE_STR,
-				    create_unspec_attr_object((uint8_t *)data.unspec,
-							      nla_len(attr)));
+		unspec = create_unspec_attr_object((uint8_t *)data.unspec,
+						   nla_len(attr));
+		json_object_set_new(obj, VALUE_STR, unspec);
 		break;
+	}
 	}
 
 	return obj;
@@ -100,22 +122,26 @@ err:
 }
 
 /* buf is assumed to point directly at the attribute stream */
-static json_t *parse_nl_attrs(uint8_t *buf, size_t buflen, nljson_t *hdl,
+static json_t *parse_nl_attrs(uint8_t *buf, size_t buflen,
+			      struct nljson_nla_policy *nljson_policy,
 			      size_t *bytes_consumed)
 {
 	struct nlattr *cur_attr;
 	json_t *obj = NULL, *cur_attr_obj;
-	int remaining, max_attr_type = 0;
+	int remaining, max_attr_type = 0, max_nested_attr_type = 0;
 	struct nla_policy *policy = NULL;
+	struct nljson_nla_policy **nested = NULL;
 	char **attr_type_to_str_map = NULL;
 
 	cur_attr = (struct nlattr *) buf;
 	remaining = buflen;
 
-	if (hdl) {
-		max_attr_type = hdl->policy->max_attr_type;
-		policy = hdl->policy->policy;
-		attr_type_to_str_map = hdl->policy->id_to_str_map;
+	if (nljson_policy) {
+		max_attr_type = nljson_policy->max_attr_type;
+		max_nested_attr_type = nljson_policy->max_nested_attr_type;
+		policy = nljson_policy->policy;
+		attr_type_to_str_map = nljson_policy->id_to_str_map;
+		nested = nljson_policy->nested;
 	}
 
 	*bytes_consumed = 0;
@@ -125,11 +151,14 @@ static json_t *parse_nl_attrs(uint8_t *buf, size_t buflen, nljson_t *hdl,
 
 	while (nla_ok(cur_attr, remaining)) {
 		int data_type = NLA_UNSPEC, type = nla_type(cur_attr);
+		struct nljson_nla_policy *cur_nested = NULL;
 
 		*bytes_consumed += (nla_len(cur_attr) + NLA_HDR_LEN);
 		if (policy && (type <= max_attr_type))
 			data_type = policy[type].type;
-		cur_attr_obj = create_attr_object(cur_attr, data_type);
+		if (nested && (type <= max_nested_attr_type))
+			cur_nested = nested[type];
+		cur_attr_obj = create_attr_object(cur_attr, data_type, cur_nested);
 		if (cur_attr_obj) {
 			if (attr_type_to_str_map && (type <= max_attr_type) &&
 			    attr_type_to_str_map[type]) {
@@ -173,17 +202,24 @@ int nljson_encode_nla(nljson_t *hdl,
 {
 	json_t *obj;
 	int rc;
+	struct nljson_nla_policy *policy;
 	struct local_encode_cb_data cb_data = {
 		.output = output,
 		.output_len = output_len,
 	};
+
+	if (hdl)
+		policy = hdl->policy;
+	else
+		policy = NULL;
 
 	/*We add JSON_PRESERVE_ORDER in order to make sure the encoded
 	 *attributes are written in the same order as in nla_stream.
 	 */
 	json_format_flags |= JSON_PRESERVE_ORDER;
 
-	obj = parse_nl_attrs((uint8_t *) nla_stream, nla_stream_len, hdl,
+	obj = parse_nl_attrs((uint8_t *) nla_stream, nla_stream_len,
+			     policy,
 			     bytes_consumed);
 	if (!obj)
 		return -EINVAL;
@@ -204,13 +240,20 @@ char *nljson_encode_nla_alloc(nljson_t *hdl,
 {
 	json_t *obj;
 	char *output;
+	struct nljson_nla_policy *policy;
+
+	if (hdl)
+		policy = hdl->policy;
+	else
+		policy = NULL;
 
 	/*We add JSON_PRESERVE_ORDER in order to make sure the encoded
 	 *attributes are written in the same order as in nla_stream.
 	 */
 	json_format_flags |= JSON_PRESERVE_ORDER;
 
-	obj = parse_nl_attrs((uint8_t *) nla_stream, nla_stream_len, hdl,
+	obj = parse_nl_attrs((uint8_t *) nla_stream, nla_stream_len,
+			     policy,
 			     bytes_consumed);
 	if (!obj)
 		return NULL;
@@ -233,6 +276,12 @@ int nljson_encode_nla_cb(nljson_t *hdl,
 {
 	json_t *obj;
 	int rc;
+	struct nljson_nla_policy *policy;
+
+	if (hdl)
+		policy = hdl->policy;
+	else
+		policy = NULL;
 
 	/*We add JSON_PRESERVE_ORDER in order to make sure the encoded
 	 *attributes are written in the same order as in nla_stream.
@@ -242,7 +291,8 @@ int nljson_encode_nla_cb(nljson_t *hdl,
 	if (!encode_cb)
 		return -EINVAL;
 
-	obj = parse_nl_attrs((uint8_t *) nla_stream, nla_stream_len, hdl,
+	obj = parse_nl_attrs((uint8_t *) nla_stream, nla_stream_len,
+			     policy,
 			     bytes_consumed);
 	if (!obj)
 		return -EINVAL;
