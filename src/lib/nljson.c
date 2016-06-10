@@ -99,18 +99,18 @@ static struct policy_list_item *create_attr_list(json_t *policy_json,
 		if (!json_is_object(value))
 			goto err;
 
-		attr_type_json = json_object_get(value, "attr_type");
+		attr_type_json = json_object_get(value, POLICY_ATTR_TYPE_STR);
 		if (!attr_type_json || !json_is_integer(attr_type_json))
 			goto err;
 		attr_type = json_integer_value(attr_type_json);
 
-		data_type_json = json_object_get(value, "data_type");
+		data_type_json = json_object_get(value, DATA_TYPE_STR);
 		if (!data_type_json || !json_is_string(data_type_json))
 			goto err;
 		data_type_str = json_string_value(data_type_json);
 		data_type = get_nl_data_type_from_string(data_type_str);
 
-		attr_len_json = json_object_get(value, "attr_len");
+		attr_len_json = json_object_get(value, POLICY_ATTR_LENGTH_STR);
 		if (attr_len_json) {
 			/* attr_len is not mandatory */
 			if (!json_is_integer(attr_len_json))
@@ -131,7 +131,7 @@ static struct policy_list_item *create_attr_list(json_t *policy_json,
 			/* In case of a nested attribute,
 			 * there must be a "policy" key
 			 */
-			nested_policy_json = json_object_get(value, "policy");
+			nested_policy_json = json_object_get(value, POLICY_STR);
 			if (!nested_policy_json)
 				goto err;
 		} else {
