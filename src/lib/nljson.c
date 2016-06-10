@@ -34,6 +34,18 @@ const char *data_type_strings[NLA_TYPE_MAX + 1] = {
 	NL_ID_TO_STR_ELEMENT(NLA_NESTED)
 };
 
+struct policy_list_item {
+	struct policy_list_item *next;
+	nljson_int_t data_type;
+	nljson_int_t attr_type;
+	nljson_int_t attr_len;
+	char *key;
+	json_t *nested_policy;
+};
+
+static int parse_policy_json(json_t *policy_json, struct nljson_nla_policy **policy);
+static void free_policy(struct nljson_nla_policy *policy);
+
 static int get_nl_data_type_from_string(const char *type_str)
 {
 	unsigned int i;
@@ -46,78 +58,217 @@ static int get_nl_data_type_from_string(const char *type_str)
 	return NLA_UNSPEC; /*Default to NLA_UNSPEC*/
 }
 
-/* Create a struct nla_policy from the JSON object policy_json.*/
-static int parse_policy_json(json_t *policy_json, struct nla_policy **policy,
-			     int *max_attr_type, char ***attr_type_to_str_map)
+static void free_attr_list(struct policy_list_item *head)
+{
+	struct policy_list_item *iter;
+
+	iter = head;
+
+	while (iter != NULL) {
+		struct policy_list_item *tmp;
+
+		tmp = iter;
+		iter = iter->next;
+		if (tmp->key)
+			free(tmp->key);
+		free(tmp);
+	}
+}
+
+/* Creates a linked list of policy attributes from a JSON object. */
+static struct policy_list_item *create_attr_list(json_t *policy_json,
+						 nljson_int_t *max_attr_type,
+						 nljson_int_t *max_nested_attr_type)
 {
 	const char *key;
 	json_t *value;
+	struct policy_list_item *prev_item, head = {.next = NULL};
 
-	*attr_type_to_str_map = NULL;
-	*policy = NULL;
+	*max_attr_type = 0;
+	*max_nested_attr_type = 0;
+	prev_item = &head;
 
-	/* First, find the maximum attribute type so we can allocate
-	 * big enough struct nla_policy and attr_type_to_str_map arrays
-	 */
 	json_object_foreach(policy_json, key, value) {
-		json_t *attr_type_json;
-		int attr_type;
+		json_t *data_type_json, *attr_type_json, *attr_len_json,
+		       *nested_policy_json;
+		nljson_int_t data_type, attr_type, attr_len;
+		const char *data_type_str;
+
+		struct policy_list_item *cur_item;
 
 		if (!json_is_object(value))
-			return -1;
+			goto err;
 
 		attr_type_json = json_object_get(value, "attr_type");
 		if (!attr_type_json || !json_is_integer(attr_type_json))
-			return -1;
-
+			goto err;
 		attr_type = json_integer_value(attr_type_json);
-		if (attr_type > *max_attr_type)
-			*max_attr_type = attr_type;
-	}
-
-	*policy = calloc(sizeof(struct nla_policy), *max_attr_type + 1);
-	if (!*policy)
-		return -1;
-
-	*attr_type_to_str_map = calloc(sizeof(char *), *max_attr_type + 1);
-	if (!*attr_type_to_str_map)
-		return -1;
-
-	/* Next, populate the nla_policy structure */
-	json_object_foreach(policy_json, key, value) {
-		json_t *data_type_json, *attr_type_json;
-		int data_type, attr_type;
-		const char *data_type_str;
-
-		if (!json_is_object(value))
-			return -1;
 
 		data_type_json = json_object_get(value, "data_type");
 		if (!data_type_json || !json_is_string(data_type_json))
-			return -1;
-
+			goto err;
 		data_type_str = json_string_value(data_type_json);
 		data_type = get_nl_data_type_from_string(data_type_str);
 
-		attr_type_json = json_object_get(value, "attr_type");
-		if (!attr_type_json || !json_is_integer(attr_type_json))
-			return -1;
+		attr_len_json = json_object_get(value, "attr_len");
+		if (attr_len_json) {
+			/* attr_len is not mandatory */
+			if (!json_is_integer(attr_len_json))
+				goto err;
 
-		attr_type = json_integer_value(attr_type_json);
+			attr_len = json_integer_value(attr_len_json);
+		} else {
+			attr_len = 0;
+		}
 
-		(*policy)[attr_type].type = data_type;
-		(*attr_type_to_str_map)[attr_type] = calloc(1, strlen(key));
-		if (!(*attr_type_to_str_map)[attr_type])
-			return -1;
-		strcpy((*attr_type_to_str_map)[attr_type], key);
+		if (attr_type > *max_attr_type)
+			*max_attr_type = attr_type;
+
+		if (data_type == NLA_NESTED) {
+			if (attr_type > *max_nested_attr_type)
+				*max_nested_attr_type = attr_type;
+
+			/* In case of a nested attribute,
+			 * there must be a "policy" key
+			 */
+			nested_policy_json = json_object_get(value, "policy");
+			if (!nested_policy_json)
+				goto err;
+		} else {
+			nested_policy_json = NULL;
+		}
+
+		cur_item = calloc(sizeof(struct policy_list_item), 1);
+		if (!cur_item)
+			goto err;
+		cur_item->attr_type = attr_type;
+		cur_item->data_type = data_type;
+		cur_item->attr_len = attr_len;
+		cur_item->nested_policy = nested_policy_json;
+		cur_item->key = calloc(1, strlen(key));
+		if (!cur_item->key)
+			goto err;
+		strcpy(cur_item->key, key);
+		prev_item->next = cur_item;
+		prev_item = cur_item;
+	}
+
+	return head.next;
+err:
+	free_attr_list(head.next);
+	return NULL;
+}
+
+/* Populates a struct nljson_nla_policy (must be allocated before calling
+ * this function) with the values in a policy_list.
+ * The list is freed continuously during iteration.
+ */
+static int populate_policy_and_free_list(struct policy_list_item *head,
+					 struct nljson_nla_policy *policy)
+{
+	struct policy_list_item *iter;
+
+	iter = head;
+
+	while (iter != NULL) {
+		struct policy_list_item *tmp;
+
+		policy->policy[iter->attr_type].type = iter->data_type;
+		policy->policy[iter->attr_type].maxlen = iter->attr_len;
+		policy->id_to_str_map[iter->attr_type] = iter->key;
+
+		if (iter->nested_policy) {
+			int rc = 0;
+
+			rc = parse_policy_json(iter->nested_policy,
+					       &policy->nested[iter->attr_type]);
+			json_decref(iter->nested_policy);
+			if (rc)
+				goto err;
+		}
+
+		tmp = iter;
+		iter = iter->next;
+		free(tmp);
 	}
 
 	return 0;
+err:
+	/* Free remaining list in case of error */
+	free_attr_list(iter);
+	return -1;
 }
 
-static void free_id_to_str_map(char **id_to_str_map, int len)
+/* Allocates a struct nljson_nla_policy */
+static struct nljson_nla_policy *alloc_nljson_nla_policy(nljson_int_t max_attr_type,
+							 nljson_int_t max_nested_attr_type)
 {
-	int i;
+	struct nljson_nla_policy *policy;
+
+	policy = calloc(sizeof(*policy), 1);
+	if (!policy)
+		goto err;
+	policy->policy = calloc(sizeof(struct nla_policy), max_attr_type + 1);
+	if (!policy->policy)
+		goto err;
+
+	policy->id_to_str_map = calloc(sizeof(char *), max_attr_type + 1);
+	if (!policy->id_to_str_map)
+		goto err;
+
+	policy->max_attr_type = max_attr_type;
+
+	if (max_nested_attr_type > 0) {
+		policy->nested = calloc(sizeof(struct nljson_nla_policy *),
+					max_nested_attr_type + 1);
+		if (!policy->nested)
+			goto err;
+
+		policy->max_nested_attr_type = max_nested_attr_type;
+	}
+
+	return policy;
+err:
+	return NULL;
+}
+
+/* Create a struct nljson_nla_policy from the JSON object policy_json.
+ * The created policy might contain nested policies, so this function might
+ * be called recursively.
+ * In case any memory allocation goes wrong, no cleanup of memory will be
+ * attempted. This must be done by the caller.
+ */
+static int parse_policy_json(json_t *policy_json, struct nljson_nla_policy **policy)
+{
+	struct policy_list_item *head;
+	nljson_int_t max_attr_type, max_nested_attr_type;
+
+	/* First, create a temporary linked list of policy attributes  */
+	head = create_attr_list(policy_json, &max_attr_type,
+				&max_nested_attr_type);
+	if (!head)
+		goto err;
+
+	/* Next, allocate an nljson nla policy structure. */
+	*policy = alloc_nljson_nla_policy(max_attr_type, max_nested_attr_type);
+	if (!*policy)
+		goto err;
+
+	/* Last, populate the structure. Note that this step might result in
+	 * a recursive call back to this function (if there are any nested
+	 * policý definitions).
+	 */
+	if (populate_policy_and_free_list(head, *policy))
+		goto err;
+
+	return 0;
+err:
+	return -1;
+}
+
+static void free_id_to_str_map(char **id_to_str_map, size_t len)
+{
+	size_t i;
 
 	for (i = 0; i < len; i++) {
 		if (id_to_str_map[i])
@@ -126,13 +277,37 @@ static void free_id_to_str_map(char **id_to_str_map, int len)
 	free(*id_to_str_map);
 }
 
+static void free_nested_policy(struct nljson_nla_policy **policy, size_t len)
+{
+	size_t i;
+
+	for (i = 0; i < len; i++) {
+		if (policy[i])
+			free_policy(policy[i]);
+	}
+	free(policy);
+}
+
+static void free_policy(struct nljson_nla_policy *policy)
+{
+	if (policy->policy)
+		free(policy->policy);
+
+	if (policy->id_to_str_map)
+		free_id_to_str_map(policy->id_to_str_map,
+				   policy->max_attr_type + 1);
+
+	if (policy->nested)
+		free_nested_policy(policy->nested,
+				   policy->max_nested_attr_type + 1);
+
+	free(policy);
+}
+
 static void free_handle(nljson_t **hdl)
 {
 	if ((*hdl)->policy)
-		free((*hdl)->policy);
-
-	if ((*hdl)->id_to_str_map)
-		free_id_to_str_map((*hdl)->id_to_str_map, (*hdl)->max_attr_type + 1);
+		free_policy((*hdl)->policy);
 
 	free(*hdl);
 	*hdl = NULL;
@@ -164,9 +339,7 @@ int nljson_init(nljson_t **hdl,
 			goto err;
 		}
 
-		rc = parse_policy_json(policy_json_obj, &(*hdl)->policy,
-				       &(*hdl)->max_attr_type,
-				       &(*hdl)->id_to_str_map);
+		rc = parse_policy_json(policy_json_obj, &(*hdl)->policy);
 	}
 
 err:
@@ -196,9 +369,7 @@ int nljson_init_file(nljson_t **hdl,
 			goto err;
 		}
 
-		rc = parse_policy_json(policy_json_obj, &(*hdl)->policy,
-				       &(*hdl)->max_attr_type,
-				       &(*hdl)->id_to_str_map);
+		rc = parse_policy_json(policy_json_obj, &(*hdl)->policy);
 	}
 
 err:
@@ -230,9 +401,7 @@ int nljson_init_cb(nljson_t **hdl,
 			goto err;
 		}
 
-		rc = parse_policy_json(policy_json_obj, &(*hdl)->policy,
-				       &(*hdl)->max_attr_type,
-				       &(*hdl)->id_to_str_map);
+		rc = parse_policy_json(policy_json_obj, &(*hdl)->policy);
 	}
 
 err:

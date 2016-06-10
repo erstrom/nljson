@@ -21,11 +21,16 @@
 
 #define NLA_HDR_LEN 4
 
-struct _nljson {
+struct nljson_nla_policy {
 	struct nla_policy *policy;
-	size_t policy_len;
-	int max_attr_type;
 	char **id_to_str_map;
+	struct nljson_nla_policy **nested;
+	nljson_int_t max_attr_type;
+	nljson_int_t max_nested_attr_type;
+};
+
+struct _nljson {
+	struct nljson_nla_policy *policy;
 };
 
 extern const char *data_type_strings[NLA_TYPE_MAX + 1];

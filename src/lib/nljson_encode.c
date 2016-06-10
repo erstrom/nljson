@@ -86,7 +86,9 @@ static json_t *create_attr_object(struct nlattr *attr, int data_type)
 	/*Fallthrough*/
 	default:
 		data.unspec = nla_data(attr);
-		json_object_set_new(obj, VALUE_STR, create_unspec_attr_object((uint8_t *)data.unspec, nla_len(attr)));
+		json_object_set_new(obj, VALUE_STR,
+				    create_unspec_attr_object((uint8_t *)data.unspec,
+							      nla_len(attr)));
 		break;
 	}
 
@@ -111,9 +113,9 @@ static json_t *parse_nl_attrs(uint8_t *buf, size_t buflen, nljson_t *hdl,
 	remaining = buflen;
 
 	if (hdl) {
-		max_attr_type = hdl->max_attr_type;
-		policy = hdl->policy;
-		attr_type_to_str_map = hdl->id_to_str_map;
+		max_attr_type = hdl->policy->max_attr_type;
+		policy = hdl->policy->policy;
+		attr_type_to_str_map = hdl->policy->id_to_str_map;
 	}
 
 	*bytes_consumed = 0;
