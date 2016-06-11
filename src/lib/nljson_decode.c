@@ -33,12 +33,14 @@ struct nlattr_list_item {
 enum json_type {
 	JSON_TYPE_INTEGER,
 	JSON_TYPE_STRING,
-	JSON_TYPE_ARRAY
+	JSON_TYPE_ARRAY,
+	JSON_TYPE_OBJECT
 };
 
 union attr_value {
 	const char *str;
 	json_t *array;
+	json_t *obj;
 	nljson_int_t integer;
 };
 
@@ -54,152 +56,8 @@ static int attr_type_lengths[NLA_TYPE_MAX + 1] = {
 	[NLA_NESTED] = 0 /* Any size */
 };
 
-static int get_data_type_from_string(const char *str)
-{
-	unsigned int i;
-
-	for (i = 0; i < NLA_TYPE_MAX + 1; i++) {
-		if (STR_MATCH(str, data_type_strings[i]))
-			break;
-	}
-
-	if (i == NLA_TYPE_MAX)
-		i = NLA_UNSPEC;
-	return i;
-}
-
-static bool attr_data_is_valid(int attr_type, int data_type, int attr_len,
-			       enum json_type attr_json_type)
-{
-	if (attr_type < 0)
-		return false;
-
-	if ((data_type > NLA_TYPE_MAX) || (data_type < 0))
-		return false;
-
-	if ((attr_type_lengths[data_type] > 0) &&
-	    (attr_len != attr_type_lengths[data_type]))
-		return false;
-
-	/* Check mismatch between data_type and json_type */
-	if (((data_type == NLA_UNSPEC) || (data_type == NLA_NESTED)) &&
-	    (attr_json_type != JSON_TYPE_ARRAY))
-		return false;
-	else if ((data_type == NLA_STRING) &&
-		 (attr_json_type != JSON_TYPE_STRING))
-		return false;
-	else if ((((data_type >= NLA_U8) && (data_type <= NLA_U64)) ||
-		 (data_type == NLA_FLAG) || (data_type == NLA_MSECS)) &&
-		 (attr_json_type != JSON_TYPE_INTEGER))
-		return false;
-
-	return true;
-}
-
-static int populate_attr(void *attr_buf, size_t attr_len, int attr_type,
-			 enum json_type attr_json_type,
-			 union attr_value attr_value)
-{
-	struct nlattr *attr;
-	size_t a_index, attr_data_len;
-	json_t *a_value;
-	uint8_t *attr_buf_u8;
-
-	attr = (struct nlattr *) attr_buf;
-	attr_buf_u8 = attr_buf + sizeof(struct nlattr);
-	attr->nla_type = (uint16_t) attr_type;
-	attr_data_len = attr_len;
-	attr->nla_len = (uint16_t) attr_data_len;
-
-	switch (attr_json_type) {
-	case JSON_TYPE_INTEGER:
-		memcpy(attr_buf_u8, &attr_value.integer, attr_data_len);
-		break;
-	case JSON_TYPE_STRING:
-		memcpy(attr_buf_u8, attr_value.str, attr_data_len);
-		break;
-	case JSON_TYPE_ARRAY:
-		json_array_foreach(attr_value.array, a_index, a_value) {
-			int a_val_int;
-
-			/* The array is expected to only contain integers */
-			if (!json_is_integer(a_value))
-				return -1;
-
-			a_val_int = json_integer_value(a_value);
-			/* The elements in the array is expected to be in the
-			 * range 0 - 255, i.e. must fit in a uint8_t */
-			if ((a_val_int < 0) || (a_val_int > 255))
-				return -1;
-			attr_buf_u8[a_index] = (uint8_t) a_val_int;
-		}
-		break;
-	}
-	return 0;
-}
-
-static struct nlattr *parse_json_attr(json_t *attr_json, size_t *attr_len)
-{
-	const char *key;
-	json_t *value;
-	void *attr_buf;
-	int attr_type = -1, data_type = NLA_UNSPEC, attr_data_len = 0, rc;
-	union attr_value attr_value;
-	enum json_type attr_json_type;
-
-	/* Read all members of each attribute */
-	json_object_foreach(attr_json, key, value) {
-		if (KEY_MATCH(key, DATA_TYPE_STR)) {
-			const char *tmp;
-
-			if (!json_is_string(value))
-				return NULL;
-			tmp = json_string_value(value);
-			data_type = get_data_type_from_string(tmp);
-		} else if (KEY_MATCH(key, ATTR_TYPE_STR)) {
-			if (!json_is_integer(value))
-				return NULL;
-			attr_type = json_integer_value(value);
-		} else if (KEY_MATCH(key, LENGTH_STR)) {
-			if (!json_is_integer(value))
-				return NULL;
-			attr_data_len = json_integer_value(value);
-		} else if (KEY_MATCH(key, VALUE_STR)) {
-			if (json_is_integer(value)) {
-				attr_json_type = JSON_TYPE_INTEGER;
-				attr_value.integer = json_integer_value(value);
-			} else if (json_is_string(value)) {
-				attr_json_type = JSON_TYPE_STRING;
-				attr_value.str = json_string_value(value);
-			} else if (json_is_array(value)) {
-				attr_json_type = JSON_TYPE_ARRAY;
-				attr_value.array = value;
-			} else {
-				return NULL;
-			}
-		}
-	}
-
-	if (!attr_data_is_valid(attr_type, data_type, attr_data_len,
-	    attr_json_type))
-		return NULL;
-
-	*attr_len = attr_data_len + NLA_HDR_LEN;
-	attr_buf = calloc(1, NLA_ALIGN(*attr_len));
-	if (!attr_buf)
-		return NULL;
-
-	rc = populate_attr(attr_buf, *attr_len, attr_type, attr_json_type,
-			   attr_value);
-	if (rc)
-		goto err;
-
-	return (struct nlattr *) attr_buf;
-err:
-	if (attr_buf)
-		free(attr_buf);
-	return NULL;
-}
+static struct nlattr_list_item *create_attr_list(json_t *attrs_json,
+						 size_t *tot_attr_len);
 
 static void free_attr_list(struct nlattr_list_item *head)
 {
@@ -218,9 +76,60 @@ static void free_attr_list(struct nlattr_list_item *head)
 	}
 }
 
+static int get_data_type_from_string(const char *str)
+{
+	unsigned int i;
+
+	for (i = 0; i < NLA_TYPE_MAX + 1; i++) {
+		if (STR_MATCH(str, data_type_strings[i]))
+			break;
+	}
+
+	if (i == (NLA_TYPE_MAX + 1))
+		i = NLA_UNSPEC;
+
+	return i;
+}
+
+/* Checks if an attribute is valid.
+ * Returns true if the attribute is valid, false otherwise.
+ */
+static bool attr_data_is_valid(int attr_type, int data_type, int attr_len,
+			       enum json_type attr_json_type)
+{
+	if (attr_type < 0)
+		return false;
+
+	if ((data_type > NLA_TYPE_MAX) || (data_type < 0))
+		return false;
+
+	if ((attr_type_lengths[data_type] > 0) &&
+	    (attr_len != attr_type_lengths[data_type]))
+		return false;
+
+	/* Check mismatch between data_type and json_type */
+	if ((data_type == NLA_UNSPEC) &&
+	    (attr_json_type != JSON_TYPE_ARRAY))
+		return false;
+	else if ((data_type == NLA_NESTED) &&
+		 (attr_json_type != JSON_TYPE_OBJECT))
+		return false;
+	else if ((data_type == NLA_STRING) &&
+		 (attr_json_type != JSON_TYPE_STRING))
+		return false;
+	else if ((((data_type >= NLA_U8) && (data_type <= NLA_U64)) ||
+		 (data_type == NLA_FLAG) || (data_type == NLA_MSECS)) &&
+		 (attr_json_type != JSON_TYPE_INTEGER))
+		return false;
+
+	return true;
+}
+
 static void populate_nla_stream_and_free_attr_list(struct nlattr_list_item *head,
 						   void *nla_stream,
-						   int (*decode_cb)(const void *buf, size_t size, void *data),
+						   int (*decode_cb)(const void *buf,
+								    size_t size,
+								    void *data),
 						   void *cb_data)
 {
 	struct nlattr_list_item *iter;
@@ -248,6 +157,152 @@ static void populate_nla_stream_and_free_attr_list(struct nlattr_list_item *head
 		free(tmp->attr);
 		free(tmp);
 	}
+}
+
+static int populate_attr(void *attr_buf, size_t attr_len, int attr_type,
+			 enum json_type attr_json_type,
+			 union attr_value attr_value,
+			 struct nlattr_list_item *nested_head)
+{
+	struct nlattr *attr;
+	size_t a_index, attr_data_len;
+	json_t *a_value;
+	uint8_t *attr_buf_u8;
+
+	attr = (struct nlattr *) attr_buf;
+	attr_buf_u8 = attr_buf + NLA_HDR_LEN;
+	attr->nla_type = (uint16_t) attr_type;
+	attr_data_len = attr_len - NLA_HDR_LEN;
+	attr->nla_len = (uint16_t) attr_len;
+
+	switch (attr_json_type) {
+	case JSON_TYPE_INTEGER:
+		memcpy(attr_buf_u8, &attr_value.integer, attr_data_len);
+		break;
+	case JSON_TYPE_STRING:
+		memcpy(attr_buf_u8, attr_value.str, attr_data_len);
+		break;
+	case JSON_TYPE_ARRAY:
+		json_array_foreach(attr_value.array, a_index, a_value) {
+			int a_val_int;
+
+			if (a_index >= attr_data_len)
+				return -1;
+
+			/* The array is expected to only contain integers */
+			if (!json_is_integer(a_value))
+				return -1;
+
+			a_val_int = json_integer_value(a_value);
+			/* The elements in the array is expected to be in the
+			 * range 0 - 255, i.e. must fit in a uint8_t */
+			if ((a_val_int < 0) || (a_val_int > 255))
+				return -1;
+			attr_buf_u8[a_index] = (uint8_t) a_val_int;
+		}
+		break;
+	case JSON_TYPE_OBJECT:
+		if (!nested_head)
+			return -1;
+
+		populate_nla_stream_and_free_attr_list(nested_head,
+						       attr_buf_u8,
+						       NULL, NULL);
+		break;
+	}
+	return 0;
+}
+
+static struct nlattr *parse_json_attr(json_t *attr_json,
+				      size_t *attr_len)
+{
+	const char *key;
+	json_t *value;
+	void *attr_buf;
+	int attr_type = -1, data_type = NLA_UNSPEC, attr_data_len = 0, rc;
+	union attr_value attr_value;
+	enum json_type attr_json_type;
+	bool length_set = false;
+	struct nlattr_list_item *nested_head = NULL;
+
+	/* Read all members of each attribute */
+	json_object_foreach(attr_json, key, value) {
+		if (KEY_MATCH(key, DATA_TYPE_STR)) {
+			const char *tmp;
+
+			if (!json_is_string(value))
+				return NULL;
+			tmp = json_string_value(value);
+			data_type = get_data_type_from_string(tmp);
+		} else if (KEY_MATCH(key, ATTR_TYPE_STR)) {
+			if (!json_is_integer(value))
+				return NULL;
+			attr_type = json_integer_value(value);
+		} else if (KEY_MATCH(key, LENGTH_STR)) {
+			if (!json_is_integer(value))
+				return NULL;
+			attr_data_len = json_integer_value(value);
+			length_set = true;
+		} else if (KEY_MATCH(key, VALUE_STR)) {
+			if (json_is_integer(value)) {
+				attr_json_type = JSON_TYPE_INTEGER;
+				attr_value.integer = json_integer_value(value);
+			} else if (json_is_string(value)) {
+				attr_json_type = JSON_TYPE_STRING;
+				attr_value.str = json_string_value(value);
+			} else if (json_is_array(value)) {
+				attr_json_type = JSON_TYPE_ARRAY;
+				attr_value.array = value;
+			} else {
+				attr_json_type = JSON_TYPE_OBJECT;
+				attr_value.obj = value;
+			}
+		}
+	}
+
+	if (!length_set) {
+		/* Special case for integers. If attribute length was not set we
+		 * will use the length of the attribute type.
+		 */
+		if ((data_type >= NLA_U8) && (data_type <= NLA_U64))
+			attr_data_len = attr_type_lengths[data_type];
+		/* Special case for strings. If attribute length was not set we
+		 * will use the length of the string.
+		 */
+		else if ((data_type == NLA_STRING) &&
+			 (attr_json_type = JSON_TYPE_STRING))
+			attr_data_len = strlen(attr_value.str);
+	}
+
+	if (!attr_data_is_valid(attr_type, data_type, attr_data_len,
+	    attr_json_type))
+		return NULL;
+
+	if (data_type == NLA_NESTED) {
+		size_t nested_len;
+
+		nested_head = create_attr_list(attr_value.obj, &nested_len);
+		if (!nested_head)
+			return NULL;
+
+		attr_data_len = nested_len;
+	}
+
+	*attr_len = attr_data_len + NLA_HDR_LEN;
+	attr_buf = calloc(1, NLA_ALIGN(*attr_len));
+	if (!attr_buf)
+		return NULL;
+
+	rc = populate_attr(attr_buf, *attr_len, attr_type, attr_json_type,
+			   attr_value, nested_head);
+	if (rc)
+		goto err;
+
+	return (struct nlattr *) attr_buf;
+err:
+	if (attr_buf)
+		free(attr_buf);
+	return NULL;
 }
 
 static struct nlattr_list_item *create_attr_list(json_t *attrs_json,
@@ -335,12 +390,15 @@ static int parse_json_attrs(json_t *attrs_json, void *nla_stream,
 		return -ENOMEM;
 
 	if (tot_attr_len > nla_stream_buf_len)
-		return -ENOMEM;
+		goto err;
 
 	populate_nla_stream_and_free_attr_list(head, nla_stream, NULL, NULL);
 	*nla_stream_len = tot_attr_len;
 
 	return 0;
+err:
+	free_attr_list(head);
+	return -ENOMEM;
 }
 
 int nljson_decode_nla(const char *input,
