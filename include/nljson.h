@@ -26,6 +26,12 @@
 typedef struct _nljson nljson_t;
 
 /**
+ * When this flag is set, the encoder will skip all unknown attributes,
+ * i.e. attributes not present in the policy.
+ */
+#define NLJSON_FLAG_SKIP_UNKNOWN_ATTRS (1)
+
+/**
  * Init family of functions.
  *
  * Initializes an nljson handle.
@@ -46,15 +52,27 @@ typedef struct _nljson nljson_t;
  *                        Passed directly to the jansson library.
  *                        See jansson documentation for more info.
  *
+ * @arg nljson_flags      Flags for the JSON encoding of the nla stream.
+ *                        See description of each flag for more info.
+ *
  * @arg policy_json       The nla policy definition string.
  *                        Must be a valid JSON string.
  *                        If NULL, no policy will be created and
- *                        all decoded attributes will have the value
+ *                        all encoded attributes will have the value
  *                        set to UNKNOWN_ATTR_<attr_type> and data_type
  *                        set to NLA_UNSPEC.
+ *                        The same thing applies to any attribute not present
+ *                        in the policy.
+ *                        This behavior can be overridden if
+ *                        NLJSON_FLAG_SKIP_UNKNOWN_ATTRS is set.
+ *                        In this case, all unknown attributes
+ *                        (attributes not present in the policy) will be
+ *                        skipped. A consequence of this is that there
+ *                        will be no output at all if policy_json is NULL
  */
 int nljson_init(nljson_t **hdl,
 		uint32_t json_format_flags,
+		uint32_t nljson_flags,
 		const char *policy_json);
 
 /**
@@ -67,15 +85,27 @@ int nljson_init(nljson_t **hdl,
  *                        Passed directly to the jansson library.
  *                        See jansson documentation for more info.
  *
+ * @arg nljson_flags      Flags for the JSON encoding of the nla stream.
+ *                        See description of each flag for more info.
+ *
  * @arg policy_file       The path to a nla policy definition file.
  *                        The path must point to a valid JSON file.
  *                        If NULL, no policy will be created and
- *                        all decoded attributes will have the value
+ *                        all encoded attributes will have the value
  *                        set to UNKNOWN_ATTR_<attr_type> and data_type
  *                        set to NLA_UNSPEC.
+ *                        The same thing applies to any attribute not present
+ *                        in the policy.
+ *                        This behavior can be overridden if
+ *                        NLJSON_FLAG_SKIP_UNKNOWN_ATTRS is set.
+ *                        In this case, all unknown attributes
+ *                        (attributes not present in the policy) will be
+ *                        skipped. A consequence of this is that there
+ *                        will be no output at all if policy_json is NULL
  */
 int nljson_init_file(nljson_t **hdl,
 		     uint32_t json_format_flags,
+		     uint32_t nljson_flags,
 		     const char *policy_file);
 
 /**
@@ -88,6 +118,10 @@ int nljson_init_file(nljson_t **hdl,
  *                        nla policy.
  *                        Passed directly to the jansson library.
  *                        See jansson documentation for more info.
+ *
+ * @arg nljson_flags      Flags for the JSON encoding of the nla stream.
+ *                        See description of each flag for more info.
+ *
  * @arg read_policy_cb    will be called continuously by nljson_init
  *                        when reading the JSON encoded nla policy
  *                        definition.
@@ -95,13 +129,23 @@ int nljson_init_file(nljson_t **hdl,
  *                        at most size bytes and return the number
  *                        of bytes written.
  *                        If NULL, no policy will be created and
- *                        all decoded attributes will have the value
+ *                        all encoded attributes will have the value
  *                        set to UNKNOWN_ATTR_<attr_type> and data_type
  *                        set to NLA_UNSPEC.
+ *                        The same thing applies to any attribute not present
+ *                        in the policy.
+ *                        This behavior can be overridden if
+ *                        NLJSON_FLAG_SKIP_UNKNOWN_ATTRS is set.
+ *                        In this case, all unknown attributes
+ *                        (attributes not present in the policy) will be
+ *                        skipped. A consequence of this is that there
+ *                        will be no output at all if policy_json is NULL
+ *
  * @arg cb_data           pointer that will passed to read_policy_cb.
  */
 int nljson_init_cb(nljson_t **hdl,
 		   uint32_t json_format_flags,
+		   uint32_t nljson_flags,
 		   size_t (*read_policy_cb)(void *buf, size_t size, void *data),
 		   void *cb_data);
 

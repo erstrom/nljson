@@ -40,7 +40,8 @@ static char output_file[256];
 static uint8_t in_buf[IN_BUF_LEN];
 
 static uint32_t json_format_flags;
-static bool policy_file_set, input_file_set, output_file_set;
+static bool policy_file_set, input_file_set, output_file_set,
+	    skip_unknown_attrs;
 
 static void print_usage(const char *argv0)
 {
@@ -54,16 +55,18 @@ static void print_usage(const char *argv0)
 	fprintf(stderr, "A policy definition can be provided, but is not necessary.\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr, "Options:\n");
-	fprintf(stderr, "  -p, --policy     netlink attribute policy file in JSON format.\n");
-	fprintf(stderr, "                   If omitted, the encoded JSON nla output will .\n");
-	fprintf(stderr, "                   have all attributes set as NLA_UNSPEC\n");
-	fprintf(stderr, "  -f, --flags      format flags for the JSON encoded output.\n");
-	fprintf(stderr, "                   See jansson library documentation for more details.\n");
-	fprintf(stderr, "  -i, --input      netlink attribute input file.\n");
-	fprintf(stderr, "                   If omitted, the nla byte stream will be read from stdin.\n");
-	fprintf(stderr, "  -o, --output     JSON encoded output stream.\n");
-	fprintf(stderr, "                   If omitted, the JSON output will be written to stdout.\n");
-	fprintf(stderr, "  --version        Print version info and exit.\n");
+	fprintf(stderr, "  -p, --policy       netlink attribute policy file in JSON format.\n");
+	fprintf(stderr, "                     If omitted, the encoded JSON nla output will .\n");
+	fprintf(stderr, "                     have all attributes set as NLA_UNSPEC\n");
+	fprintf(stderr, "  -f, --flags        format flags for the JSON encoded output.\n");
+	fprintf(stderr, "                     See jansson library documentation for more details.\n");
+	fprintf(stderr, "  -i, --input        netlink attribute input file.\n");
+	fprintf(stderr, "                     If omitted, the nla byte stream will be read from stdin.\n");
+	fprintf(stderr, "  -o, --output       JSON encoded output stream.\n");
+	fprintf(stderr, "                     If omitted, the JSON output will be written to stdout.\n");
+	fprintf(stderr, "  -s, --skip-unknown Skip all unknown attributes (attributes not present in\n");
+	fprintf(stderr, "                     the policy file).\n");
+	fprintf(stderr, "  --version          Print version info and exit.\n");
 	fprintf(stderr, "\n");
 }
 
@@ -83,7 +86,7 @@ static void do_encode(void)
 	size_t in_buf_offset = 0;
 
 	if (policy_file_set)
-		rc = nljson_init_file(&hdl, 0, policy_file);
+		rc = nljson_init_file(&hdl, 0, skip_unknown_attrs, policy_file);
 
 	if (rc)
 		goto out;
@@ -161,11 +164,12 @@ int main(int argc, char *argv[])
 		{"flags", required_argument, 0, 'f'},
 		{"input", required_argument, 0, 'i'},
 		{"output", required_argument, 0, 'o'},
+		{"skip-unknown", no_argument, 0, 's'},
 		{"version", no_argument, 0, 1000},
 		{NULL, 0, 0, 0},
 	};
 
-	while ((opt = getopt_long(argc, argv, "hp:f:i:o:", long_opts, &optind)) != -1) {
+	while ((opt = getopt_long(argc, argv, "hp:f:i:o:s", long_opts, &optind)) != -1) {
 		switch (opt) {
 		case 'p':
 			strncpy(policy_file, optarg, sizeof(policy_file));
@@ -186,6 +190,9 @@ int main(int argc, char *argv[])
 		case 'o':
 			strncpy(output_file, optarg, sizeof(output_file));
 			output_file_set = true;
+			break;
+		case 's':
+			skip_unknown_attrs = true;
 			break;
 		case 1000:
 			print_version();

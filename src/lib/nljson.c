@@ -321,6 +321,7 @@ void nljson_deinit(nljson_t **hdl)
 
 int nljson_init(nljson_t **hdl,
 		uint32_t json_format_flags,
+		uint32_t nljson_flags,
 		const char *policy_json)
 {
 	int rc;
@@ -342,6 +343,9 @@ int nljson_init(nljson_t **hdl,
 		rc = parse_policy_json(policy_json_obj, &(*hdl)->policy);
 	}
 
+	if (nljson_flags & NLJSON_FLAG_SKIP_UNKNOWN_ATTRS)
+		(*hdl)->skip_unknown_attrs = true;
+
 err:
 	if (rc)
 		free_handle(hdl);
@@ -350,6 +354,7 @@ err:
 
 int nljson_init_file(nljson_t **hdl,
 		     uint32_t json_format_flags,
+		     uint32_t nljson_flags,
 		     const char *policy_file)
 {
 	int rc;
@@ -372,6 +377,9 @@ int nljson_init_file(nljson_t **hdl,
 		rc = parse_policy_json(policy_json_obj, &(*hdl)->policy);
 	}
 
+	if (nljson_flags & NLJSON_FLAG_SKIP_UNKNOWN_ATTRS)
+		(*hdl)->skip_unknown_attrs = true;
+
 err:
 	if (rc)
 		free_handle(hdl);
@@ -380,6 +388,7 @@ err:
 
 int nljson_init_cb(nljson_t **hdl,
 		   uint32_t json_format_flags,
+		   uint32_t nljson_flags,
 		   size_t (*read_policy_cb)(void *, size_t, void *),
 		   void *cb_data)
 {
@@ -403,6 +412,9 @@ int nljson_init_cb(nljson_t **hdl,
 
 		rc = parse_policy_json(policy_json_obj, &(*hdl)->policy);
 	}
+
+	if (nljson_flags & NLJSON_FLAG_SKIP_UNKNOWN_ATTRS)
+		(*hdl)->skip_unknown_attrs = true;
 
 err:
 	if (rc)

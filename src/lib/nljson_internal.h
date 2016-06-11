@@ -48,6 +48,7 @@ struct nljson_nla_policy {
 
 struct _nljson {
 	struct nljson_nla_policy *policy;
+	bool skip_unknown_attrs;
 };
 
 extern const char *data_type_strings[NLA_TYPE_MAX + 1];
