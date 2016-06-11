@@ -32,14 +32,12 @@
 #include <nljson_tools_config.h>
 
 #define IN_BUF_LEN (1024)
-#define OUT_BUF_LEN (1024)
 
 static char policy_file[256];
 static char input_file[256];
 static char output_file[256];
 
 static uint8_t in_buf[IN_BUF_LEN];
-static char out_buf[IN_BUF_LEN];
 
 static uint32_t json_format_flags;
 static bool policy_file_set, input_file_set, output_file_set;
@@ -121,13 +119,17 @@ static void do_encode(void)
 		if (read_len <= 0)
 			break;
 		while (read_len > 0) {
-			rc = nljson_encode_nla(hdl, in_buf, read_len, out_buf,
-					       sizeof(out_buf),
-					       &consumed, &produced,
-					       json_format_flags);
-			if (rc || (produced == 0) || (consumed == 0))
+			char *out_buf;
+
+			out_buf = nljson_encode_nla_alloc(hdl, in_buf,
+							  sizeof(in_buf),
+							  &consumed, &produced,
+							  json_format_flags);
+
+			if (!out_buf || (produced == 0) || (consumed == 0))
 				break;
 			write_len = write(out_fd, out_buf, produced);
+			free(out_buf);
 			if ((size_t) write_len != produced)
 				break;
 			if (consumed < (size_t) read_len) {
