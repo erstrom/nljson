@@ -21,9 +21,8 @@
 
 #include <stdint.h>
 #include <stdio.h>
-#define NLJSON_OK (0)
 
-typedef struct _nljson nljson_t;
+#define NLJSON_ERR_STR_LEN (256)
 
 /**
  * When this flag is set, the encoder will skip all unknown attributes,
@@ -32,11 +31,32 @@ typedef struct _nljson nljson_t;
 #define NLJSON_FLAG_SKIP_UNKNOWN_ATTRS (1)
 
 /**
+ * nljson handle.
+ */
+typedef struct _nljson nljson_t;
+
+/**
+ * Structure used to describe an error that has occured during
+ * any operation (encoding, decoding or initialization).
+ */
+struct nljson_error {
+	/**
+	 * Error message describing the error
+	 */
+	char err_msg[NLJSON_ERR_STR_LEN];
+	/**
+	 * Error code (if applicable)
+	 * The error code will be one of the errors defined in errno.h
+	 * Some errors might not have an error code (none of the errno.h
+	 * codes are applicable). In this case, err_code will be set to 0
+	 */
+	int err_code;
+};
+
+/**
  * Init family of functions.
  *
  * Initializes an nljson handle.
- * The init functions must be called prior to any other nljson
- * function calls.
  * These functions will allocate the handle and create the nl attribute
  * policy from the JSON input. The different init functions will read
  * the JSON policy in different ways.
@@ -69,11 +89,19 @@ typedef struct _nljson nljson_t;
  *                        (attributes not present in the policy) will be
  *                        skipped. A consequence of this is that there
  *                        will be no output at all if policy_json is NULL
+ *
+ * @arg error             Error output. The struct must be allocated by the
+ *                        caller.
+ *
+ * @return 0 on success or -1 on error.
+ *
+ * In case of error, *error will be written with a description of the error.
  */
 int nljson_init(nljson_t **hdl,
 		uint32_t json_format_flags,
 		uint32_t nljson_flags,
-		const char *policy_json);
+		const char *policy_json,
+		struct nljson_error *error);
 
 /**
  * Init function reading the nla JSON policy from a file.
@@ -102,11 +130,19 @@ int nljson_init(nljson_t **hdl,
  *                        (attributes not present in the policy) will be
  *                        skipped. A consequence of this is that there
  *                        will be no output at all if policy_json is NULL
+ *
+ * @arg error             Error output. The struct must be allocated by the
+ *                        caller.
+ *
+ * @return 0 on success or -1 on error.
+ *
+ * In case of error, *error will be written with a description of the error.
  */
 int nljson_init_file(nljson_t **hdl,
 		     uint32_t json_format_flags,
 		     uint32_t nljson_flags,
-		     const char *policy_file);
+		     const char *policy_file,
+		     struct nljson_error *error);
 
 /**
  * Init function using a callback function to read the nla JSON
@@ -142,12 +178,20 @@ int nljson_init_file(nljson_t **hdl,
  *                        will be no output at all if policy_json is NULL
  *
  * @arg cb_data           pointer that will passed to read_policy_cb.
+ *
+ * @arg error             Error output. The struct must be allocated by the
+ *                        caller.
+ *
+ * @return 0 on success or -1 on error.
+ *
+ * In case of error, *error will be written with a description of the error.
  */
 int nljson_init_cb(nljson_t **hdl,
 		   uint32_t json_format_flags,
 		   uint32_t nljson_flags,
 		   size_t (*read_policy_cb)(void *buf, size_t size, void *data),
-		   void *cb_data);
+		   void *cb_data,
+		   struct nljson_error *error);
 
 /**
  * De-initializes the nljson handle by freeing all memory allocated
@@ -199,6 +243,13 @@ void nljson_deinit(nljson_t **hdl);
  * @arg json_format_flags Flags for the JSON output formating.
  *                        Passed directly to the jansson library.
  *                        See jansson documentation for more info.
+ *
+ * @arg error             Error output. The struct must be allocated by the
+ *                        caller.
+ *
+ * @return 0 on success or -1 on error.
+ *
+ * In case of error, *error will be written with a description of the error.
  */
 int nljson_encode_nla(nljson_t *hdl,
 		      const void *nla_stream,
@@ -207,7 +258,8 @@ int nljson_encode_nla(nljson_t *hdl,
 		      size_t output_len,
 		      size_t *bytes_consumed,
 		      size_t *bytes_produced,
-		      uint32_t json_format_flags);
+		      uint32_t json_format_flags,
+		      struct nljson_error *error);
 
 /**
  * Similar to nljson_encode_nla but the output buffer is allocated
@@ -236,13 +288,21 @@ int nljson_encode_nla(nljson_t *hdl,
  * @arg json_format_flags Flags for the JSON output formating.
  *                        Passed directly to the jansson library.
  *                        See jansson documentation for more info.
+ *
+ * @arg error             Error output. The struct must be allocated by the
+ *                        caller.
+ *
+ * @return pointer to output buffer on success or NULL on error.
+ *
+ * In case of error, *error will be written with a description of the error.
  */
 char *nljson_encode_nla_alloc(nljson_t *hdl,
 			      const void *nla_stream,
 			      size_t nla_stream_len,
 			      size_t *bytes_consumed,
 			      size_t *bytes_produced,
-			      uint32_t json_format_flags);
+			      uint32_t json_format_flags,
+			      struct nljson_error *error);
 
 /**
  * Similar to nljson_encode_nla but the output is passed (in chunks)
@@ -271,6 +331,13 @@ char *nljson_encode_nla_alloc(nljson_t *hdl,
  * @arg json_format_flags Flags for the JSON output formating.
  *                        Passed directly to the jansson library.
  *                        See jansson documentation for more info.
+ *
+ * @arg error             Error output. The struct must be allocated by the
+ *                        caller.
+ *
+ * @return 0 on success or -1 on error.
+ *
+ * In case of error, *error will be written with a description of the error.
  */
 int nljson_encode_nla_cb(nljson_t *hdl,
 			 const void *nla_stream,
@@ -280,7 +347,8 @@ int nljson_encode_nla_cb(nljson_t *hdl,
 					  size_t size,
 					  void *data),
 			 void *cb_data,
-			 uint32_t json_format_flags);
+			 uint32_t json_format_flags,
+			 struct nljson_error *error);
 
 /**
  * Decode family of functions.
@@ -312,13 +380,21 @@ int nljson_encode_nla_cb(nljson_t *hdl,
  * @arg json_decode_flags Flags for the JSON input parsing.
  *                        Passed directly to the jansson library.
  *                        See jansson documentation for more info.
+ *
+ * @arg error             Error output. The struct must be allocated by the
+ *                        caller.
+ *
+ * @return 0 on success or -1 on error.
+ *
+ * In case of error, *error will be written with a description of the error.
  */
 int nljson_decode_nla(const char *input,
 		      void *nla_stream,
 		      size_t nla_stream_buf_len,
 		      size_t *bytes_consumed,
 		      size_t *bytes_produced,
-		      uint32_t json_decode_flags);
+		      uint32_t json_decode_flags,
+		      struct nljson_error *error);
 
 /**
  * Similar to nljson_decode_nla but the output buffer is allocated
@@ -339,11 +415,19 @@ int nljson_decode_nla(const char *input,
  * @arg json_decode_flags Flags for the JSON input parsing.
  *                        Passed directly to the jansson library.
  *                        See jansson documentation for more info.
+ *
+ * @arg error             Error output. The struct must be allocated by the
+ *                        caller.
+ *
+ * @return pointer to output buffer on success or NULL on error.
+ *
+ * In case of error, *error will be written with a description of the error.
  */
 void *nljson_decode_nla_alloc(const char *input,
 			      size_t *bytes_consumed,
 			      size_t *bytes_produced,
-			      uint32_t json_decode_flags);
+			      uint32_t json_decode_flags,
+			      struct nljson_error *error);
 
 
 /**
@@ -363,6 +447,13 @@ void *nljson_decode_nla_alloc(const char *input,
  * @arg json_decode_flags Flags for the JSON input parsing.
  *                        Passed directly to the jansson library.
  *                        See jansson documentation for more info.
+ *
+ * @arg error             Error output. The struct must be allocated by the
+ *                        caller.
+ *
+ * @return 0 on success or -1 on error.
+ *
+ * In case of error, *error will be written with a description of the error.
  */
 int nljson_decode_nla_cb(const char *input,
 			 size_t *bytes_consumed,
@@ -370,7 +461,8 @@ int nljson_decode_nla_cb(const char *input,
 					  size_t size,
 					  void *data),
 			 void *cb_data,
-			 uint32_t json_decode_flags);
+			 uint32_t json_decode_flags,
+			 struct nljson_error *error);
 
 #endif
 

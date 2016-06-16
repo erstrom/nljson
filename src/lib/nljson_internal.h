@@ -10,6 +10,18 @@
 
 #define ARRAY_SIZE(A) (sizeof(A) / sizeof((A)[0]))
 
+#define SET_ERR(error, code, fmt, ...) \
+	do { \
+		if (error) { \
+			snprintf((error)->err_msg, sizeof((error)->err_msg), \
+				 (fmt), ##__VA_ARGS__); \
+			(error)->err_code = code; \
+		} \
+	} while (0)
+
+#define SET_ERR_MSG(error, fmt, ...) SET_ERR((error), 0, (fmt), ##__VA_ARGS__)
+
+
 /*
  * JSON key strings used in the JSON encoded nla streams and
  * policy files.

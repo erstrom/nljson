@@ -122,21 +122,27 @@ static void do_decode(void)
 	for (;;) {
 		ssize_t read_len, write_len;
 		size_t consumed, produced;
+		bool eof_reached = false;
 
 		read_len = read(in_fd, in_buf + in_buf_len,
 				sizeof(in_buf) - in_buf_len);
-		if (read_len <= 0)
-			break;
+		if (read_len <= 0) {
+			read_len = 0;
+			eof_reached = true;
+		}
 
 		in_buf_len += read_len;
 
 		while (in_buf_len > 0) {
 			size_t i;
+			struct nljson_error error;
 
 			rc = nljson_decode_nla(in_buf, out_buf,
 					       sizeof(out_buf),
 					       &consumed, &produced,
-					       json_format_flags);
+					       json_format_flags,
+					       &error);
+
 			if (rc || (produced == 0) || (consumed == 0))
 				break;
 			if (ascii_output)
@@ -168,6 +174,9 @@ static void do_decode(void)
 				memmove(in_buf, in_buf + i, in_buf_len);
 			}
 		}
+
+		if (eof_reached)
+			break;
 	}
 out:
 	if (in_fd > 0)

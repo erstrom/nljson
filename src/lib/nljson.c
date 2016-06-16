@@ -336,103 +336,139 @@ void nljson_deinit(nljson_t **hdl)
 int nljson_init(nljson_t **hdl,
 		uint32_t json_format_flags,
 		uint32_t nljson_flags,
-		const char *policy_json)
+		const char *policy_json,
+		struct nljson_error *error)
 {
 	int rc;
 	json_t *policy_json_obj;
-	json_error_t error;
+	json_error_t json_error;
+
+	memset(error, 0, sizeof(*error));
 
 	*hdl = calloc(sizeof(struct _nljson), 1);
-	if (!*hdl)
-		return -ENOMEM;
+	if (!*hdl) {
+		SET_ERR(error, ENOMEM, "Unable to allocate nljson handle");
+		return -1;
+	}
 
 	if (policy_json) {
 		policy_json_obj = json_loads(policy_json, json_format_flags,
-					     &error);
+					     &json_error);
 		if (!policy_json_obj) {
-			rc = -EINVAL;
+			SET_ERR(error, EINVAL,
+				"JSON error line %d, column %d, offset %u: %s",
+				json_error.line, json_error.column,
+				json_error.position, json_error.text);
 			goto err;
 		}
 
 		rc = parse_policy_json(policy_json_obj, &(*hdl)->policy);
+		if (rc) {
+			SET_ERR(error, EINVAL, "Parse error");
+			goto err;
+		}
 	}
 
 	if (nljson_flags & NLJSON_FLAG_SKIP_UNKNOWN_ATTRS)
 		(*hdl)->skip_unknown_attrs = true;
 
+	return 0;
 err:
-	if (rc)
-		free_handle(hdl);
-	return rc;
+	free_handle(hdl);
+	return -1;
 }
 
 int nljson_init_file(nljson_t **hdl,
 		     uint32_t json_format_flags,
 		     uint32_t nljson_flags,
-		     const char *policy_file)
+		     const char *policy_file,
+		     struct nljson_error *error)
 {
 	int rc;
 	json_t *policy_json_obj;
-	json_error_t error;
+	json_error_t json_error;
+
+	memset(error, 0, sizeof(*error));
 
 	*hdl = calloc(sizeof(struct _nljson), 1);
-	if (!*hdl)
-		return -ENOMEM;
+	if (!*hdl) {
+		SET_ERR(error, ENOMEM, "Unable to allocate nljson handle");
+		return -1;
+	}
 
 	if (policy_file) {
 		policy_json_obj = json_load_file(policy_file,
 						 json_format_flags,
-						 &error);
+						 &json_error);
 		if (!policy_json_obj) {
-			rc = -EINVAL;
+			SET_ERR(error, EINVAL,
+				"JSON error line %d, column %d, offset %u: %s",
+				json_error.line, json_error.column,
+				json_error.position, json_error.text);
 			goto err;
 		}
 
 		rc = parse_policy_json(policy_json_obj, &(*hdl)->policy);
+		if (rc) {
+			SET_ERR(error, EINVAL, "Parse error");
+			goto err;
+		}
 	}
 
 	if (nljson_flags & NLJSON_FLAG_SKIP_UNKNOWN_ATTRS)
 		(*hdl)->skip_unknown_attrs = true;
 
+	return 0;
 err:
-	if (rc)
-		free_handle(hdl);
-	return rc;
+	free_handle(hdl);
+	return -1;
 }
 
 int nljson_init_cb(nljson_t **hdl,
 		   uint32_t json_format_flags,
 		   uint32_t nljson_flags,
 		   size_t (*read_policy_cb)(void *, size_t, void *),
-		   void *cb_data)
+		   void *cb_data,
+		   struct nljson_error *error)
 {
 	int rc;
 	json_t *policy_json_obj;
-	json_error_t error;
+	json_error_t json_error;
+
+	memset(error, 0, sizeof(*error));
 
 	*hdl = calloc(sizeof(struct _nljson), 1);
-	if (!*hdl)
-		return -ENOMEM;
+	if (!*hdl) {
+		SET_ERR(error, ENOMEM, "Unable to allocate nljson handle");
+		return -1;
+	}
 
 	if (read_policy_cb) {
 		policy_json_obj = json_load_callback(read_policy_cb,
 						     cb_data,
 						     json_format_flags,
-						     &error);
+						     &json_error);
 		if (!policy_json_obj) {
-			rc = -EINVAL;
+			SET_ERR(error, EINVAL,
+				"JSON error line %d, column %d, offset %u: %s",
+				json_error.line, json_error.column,
+				json_error.position, json_error.text);
 			goto err;
 		}
 
 		rc = parse_policy_json(policy_json_obj, &(*hdl)->policy);
+		if (rc) {
+			SET_ERR(error, EINVAL, "Parse error");
+			goto err;
+		}
 	}
 
 	if (nljson_flags & NLJSON_FLAG_SKIP_UNKNOWN_ATTRS)
 		(*hdl)->skip_unknown_attrs = true;
 
+	return 0;
 err:
-	if (rc)
-		free_handle(hdl);
-	return rc;
+	free_handle(hdl);
+	return -1;
 }
 

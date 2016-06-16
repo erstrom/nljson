@@ -202,7 +202,8 @@ int nljson_encode_nla(nljson_t *hdl,
 		      size_t output_len,
 		      size_t *bytes_consumed,
 		      size_t *bytes_produced,
-		      uint32_t json_format_flags)
+		      uint32_t json_format_flags,
+		      struct nljson_error *error)
 {
 	json_t *obj;
 	int rc;
@@ -213,6 +214,8 @@ int nljson_encode_nla(nljson_t *hdl,
 		.output_len = output_len,
 	};
 
+	memset(error, 0, sizeof(*error));
+
 	if (hdl) {
 		policy = hdl->policy;
 		skip_unknown_attrs = hdl->skip_unknown_attrs;
@@ -225,14 +228,24 @@ int nljson_encode_nla(nljson_t *hdl,
 
 	obj = parse_nl_attrs((uint8_t *) nla_stream, nla_stream_len,
 			     policy, bytes_consumed, skip_unknown_attrs);
-	if (!obj)
-		return -EINVAL;
+	if (!obj) {
+		SET_ERR(error, EINVAL, "Parse error");
+		return -1;
+	}
 
 	rc = json_dump_callback(obj, local_encode_cb, &cb_data,
 				json_format_flags);
+	if (rc) {
+		SET_ERR(error, EINVAL, "JSON dump error");
+		goto err;
+	}
 	json_decref(obj);
 	*bytes_produced = cb_data.bytes_consumed;
 	return rc;
+err:
+	json_decref(obj);
+	*bytes_produced = 0;
+	return -1;
 }
 
 char *nljson_encode_nla_alloc(nljson_t *hdl,
@@ -240,12 +253,15 @@ char *nljson_encode_nla_alloc(nljson_t *hdl,
 			      size_t nla_stream_len,
 			      size_t *bytes_consumed,
 			      size_t *bytes_produced,
-			      uint32_t json_format_flags)
+			      uint32_t json_format_flags,
+			      struct nljson_error *error)
 {
 	json_t *obj;
 	char *output;
 	struct nljson_nla_policy *policy = NULL;
 	bool skip_unknown_attrs = false;
+
+	memset(error, 0, sizeof(*error));
 
 	if (hdl) {
 		policy = hdl->policy;
@@ -259,13 +275,23 @@ char *nljson_encode_nla_alloc(nljson_t *hdl,
 
 	obj = parse_nl_attrs((uint8_t *) nla_stream, nla_stream_len,
 			     policy, bytes_consumed, skip_unknown_attrs);
-	if (!obj)
+	if (!obj) {
+		SET_ERR(error, EINVAL, "Parse error");
 		return NULL;
+	}
 
 	output = json_dumps(obj, json_format_flags);
+	if (!output) {
+		SET_ERR(error, EINVAL, "JSON dump error");
+		goto err;
+	}
 	json_decref(obj);
 	*bytes_produced = strlen(output);
 	return output;
+err:
+	json_decref(obj);
+	*bytes_produced = 0;
+	return NULL;
 }
 
 int nljson_encode_nla_cb(nljson_t *hdl,
@@ -276,12 +302,15 @@ int nljson_encode_nla_cb(nljson_t *hdl,
 					  size_t size,
 					  void *data),
 			 void *cb_data,
-			 uint32_t json_format_flags)
+			 uint32_t json_format_flags,
+			 struct nljson_error *error)
 {
 	json_t *obj;
 	int rc;
 	struct nljson_nla_policy *policy = NULL;
 	bool skip_unknown_attrs = false;
+
+	memset(error, 0, sizeof(*error));
 
 	if (hdl) {
 		policy = hdl->policy;
@@ -293,17 +322,29 @@ int nljson_encode_nla_cb(nljson_t *hdl,
 	 */
 	json_format_flags |= JSON_PRESERVE_ORDER;
 
-	if (!encode_cb)
+	if (!encode_cb) {
+		SET_ERR(error, EINVAL, "encode_cb == NULL");
 		return -EINVAL;
+	}
 
 	obj = parse_nl_attrs((uint8_t *) nla_stream, nla_stream_len,
 			     policy, bytes_consumed, skip_unknown_attrs);
-	if (!obj)
-		return -EINVAL;
+	if (!obj) {
+		SET_ERR(error, EINVAL, "Parse error");
+		return -1;
+	}
 
 	rc = json_dump_callback(obj, encode_cb, cb_data,
 				json_format_flags);
+	if (rc) {
+		SET_ERR(error, EINVAL, "JSON dump error");
+		goto err;
+	}
+
 	json_decref(obj);
-	return rc;
+	return 0;
+err:
+	json_decref(obj);
+	return -1;
 }
 

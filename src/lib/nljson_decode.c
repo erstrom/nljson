@@ -406,61 +406,83 @@ int nljson_decode_nla(const char *input,
 		      size_t nla_stream_buf_len,
 		      size_t *bytes_consumed,
 		      size_t *bytes_produced,
-		      uint32_t json_decode_flags)
+		      uint32_t json_decode_flags,
+		      struct nljson_error *error)
 {
 	int rc;
 	json_t *obj = NULL;
-	json_error_t error;
+	json_error_t json_error;
+
+	memset(error, 0, sizeof(*error));
 
 	/*We must have JSON_DISABLE_EOF_CHECK set in order to handle
 	 *the case where not all bytes in input are consumed
 	 */
 	json_decode_flags |= JSON_DISABLE_EOF_CHECK;
-	obj = json_loads(input, json_decode_flags, &error);
-	if (!obj)
+	obj = json_loads(input, json_decode_flags, &json_error);
+	if (!obj) {
+		SET_ERR(error, EINVAL,
+			"JSON error line %d, column %d, offset %u: %s",
+			json_error.line, json_error.column,
+			json_error.position, json_error.text);
 		goto err;
+	}
 
 	rc = parse_json_attrs(obj, nla_stream, nla_stream_buf_len,
 			      bytes_produced);
-	if (rc)
+	if (rc) {
+		SET_ERR(error, EINVAL, "Parse error");
 		goto err;
+	}
 
 	json_decref(obj);
-	*bytes_consumed = error.position;
-	return rc;
+	*bytes_consumed = json_error.position;
+
+	return 0;
 err:
 	*bytes_consumed = 0;
 	*bytes_produced = 0;
 	if (obj)
 		json_decref(obj);
-	return -EINVAL;
+	return -1;
 
 }
 
 void *nljson_decode_nla_alloc(const char *input,
 			      size_t *bytes_consumed,
 			      size_t *bytes_produced,
-			      uint32_t json_decode_flags)
+			      uint32_t json_decode_flags,
+			      struct nljson_error *error)
 {
 	int rc;
 	json_t *obj = NULL;
-	json_error_t error;
+	json_error_t json_error;
 	void *nla_stream;
+
+	memset(error, 0, sizeof(*error));
 
 	/*We must have JSON_DISABLE_EOF_CHECK set in order to handle
 	 *the case where not all bytes in input are consumed
 	 */
 	json_decode_flags |= JSON_DISABLE_EOF_CHECK;
-	obj = json_loads(input, json_decode_flags, &error);
-	if (!obj)
+	obj = json_loads(input, json_decode_flags, &json_error);
+	if (!obj) {
+		SET_ERR(error, EINVAL,
+			"JSON error line %d, column %d, offset %u: %s",
+			json_error.line, json_error.column,
+			json_error.position, json_error.text);
 		goto err;
+	}
 
 	rc = parse_json_attrs_alloc(obj, &nla_stream, bytes_produced);
-	if (rc)
+	if (rc) {
+		SET_ERR(error, EINVAL, "Parse error");
 		goto err;
+	}
 
 	json_decref(obj);
-	*bytes_consumed = error.position;
+	*bytes_consumed = json_error.position;
+
 	return nla_stream;
 err:
 	*bytes_consumed = 0;
@@ -477,29 +499,42 @@ int nljson_decode_nla_cb(const char *input,
 					  size_t size,
 					  void *data),
 			 void *cb_data,
-			 uint32_t json_decode_flags)
+			 uint32_t json_decode_flags,
+			 struct nljson_error *error)
 {
 	int rc;
 	json_t *obj = NULL;
-	json_error_t error;
+	json_error_t json_error;
+
+	memset(error, 0, sizeof(*error));
 
 	/*We must have JSON_DISABLE_EOF_CHECK set in order to handle
 	 *the case where not all bytes in input are consumed
 	 */
 	json_decode_flags |= JSON_DISABLE_EOF_CHECK;
-	obj = json_loads(input, json_decode_flags, &error);
-	if (!obj)
+	obj = json_loads(input, json_decode_flags, &json_error);
+	if (!obj) {
+		SET_ERR(error, EINVAL,
+			"JSON error line %d, column %d, offset %u: %s",
+			json_error.line, json_error.column,
+			json_error.position, json_error.text);
 		goto err;
+	}
 
 	rc = parse_json_attrs_cb(obj, decode_cb, cb_data);
+	if (rc) {
+		SET_ERR(error, EINVAL, "Parse error");
+		goto err;
+	}
 
 	json_decref(obj);
-	*bytes_consumed = error.position;
-	return rc;
+	*bytes_consumed = json_error.position;
+
+	return 0;
 err:
 	*bytes_consumed = 0;
 	if (obj)
 		json_decref(obj);
-	return -EINVAL;
+	return -1;
 }
 

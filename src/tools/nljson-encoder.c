@@ -84,9 +84,11 @@ static void do_encode(void)
 	int rc = 0, in_fd, out_fd;
 	nljson_t *hdl = NULL;
 	size_t in_buf_len = 0;
+	struct nljson_error error;
 
 	if (policy_file_set)
-		rc = nljson_init_file(&hdl, 0, skip_unknown_attrs, policy_file);
+		rc = nljson_init_file(&hdl, 0, skip_unknown_attrs,
+				      policy_file, &error);
 
 	if (rc)
 		goto out;
@@ -116,11 +118,14 @@ static void do_encode(void)
 	for (;;) {
 		ssize_t read_len, write_len;
 		size_t consumed, produced;
+		bool eof_reached = false;
 
 		read_len = read(in_fd, in_buf + in_buf_len,
 				sizeof(in_buf) - in_buf_len);
-		if (read_len <= 0)
-			break;
+		if (read_len <= 0) {
+			read_len = 0;
+			eof_reached = true;
+		}
 
 		in_buf_len += read_len;
 
@@ -130,10 +135,12 @@ static void do_encode(void)
 			out_buf = nljson_encode_nla_alloc(hdl, in_buf,
 							  sizeof(in_buf),
 							  &consumed, &produced,
-							  json_format_flags);
+							  json_format_flags,
+							  &error);
 
-			if (!out_buf || (produced == 0) || (consumed == 0))
+			if ((!out_buf) || (produced == 0) || (consumed == 0))
 				break;
+
 			write_len = write(out_fd, out_buf, produced);
 			free(out_buf);
 			if ((size_t) write_len != produced)
@@ -147,6 +154,9 @@ static void do_encode(void)
 			in_buf_len -= consumed;
 			memmove(in_buf, in_buf + consumed, in_buf_len);
 		}
+
+		if (eof_reached)
+			break;
 	}
 out:
 	if (hdl)
