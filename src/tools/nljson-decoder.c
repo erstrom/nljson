@@ -95,7 +95,7 @@ static int write_ascii(int fd, const uint8_t *buf, size_t len)
 static void do_decode(void)
 {
 	int rc = 0, in_fd, out_fd;
-	size_t in_buf_offset = 0;
+	size_t in_buf_len = 0;
 
 	if (input_file_set)
 		in_fd = open(input_file, O_RDONLY);
@@ -123,12 +123,16 @@ static void do_decode(void)
 		ssize_t read_len, write_len;
 		size_t consumed, produced;
 
-		read_len = read(in_fd, in_buf + in_buf_offset,
-				sizeof(in_buf) - in_buf_offset);
+		read_len = read(in_fd, in_buf + in_buf_len,
+				sizeof(in_buf) - in_buf_len);
 		if (read_len <= 0)
 			break;
 
-		while (read_len > 0) {
+		in_buf_len += read_len;
+
+		while (in_buf_len > 0) {
+			size_t i;
+
 			rc = nljson_decode_nla(in_buf, out_buf,
 					       sizeof(out_buf),
 					       &consumed, &produced,
@@ -142,14 +146,27 @@ static void do_decode(void)
 				write_len = write(out_fd, out_buf, produced);
 			if ((size_t) write_len != produced)
 				break;
-			if (consumed < (size_t) read_len) {
-				in_buf_offset = read_len - consumed;
-				memmove(in_buf, in_buf + consumed,
-					in_buf_offset);
-			} else {
-				in_buf_offset = 0;
+			if (consumed > (size_t) in_buf_len) {
+				fprintf(stderr, "Error: Consumed %u bytes "
+					"out of %u", consumed, produced);
+				break;
 			}
-			read_len -= consumed;
+
+			in_buf_len -= consumed;
+			memmove(in_buf, in_buf + consumed, in_buf_len);
+
+			/* Make sure in_buf begins with a '{', otherwise
+			 * nljson_decode_nla will fail.
+			 */
+			for (i = 0; i < in_buf_len; i++) {
+				if (in_buf[i] == '{')
+					break;
+			}
+
+			if (i > 0) {
+				in_buf_len -= i;
+				memmove(in_buf, in_buf + i, in_buf_len);
+			}
 		}
 	}
 out:

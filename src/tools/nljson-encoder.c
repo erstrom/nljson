@@ -83,7 +83,7 @@ static void do_encode(void)
 {
 	int rc = 0, in_fd, out_fd;
 	nljson_t *hdl = NULL;
-	size_t in_buf_offset = 0;
+	size_t in_buf_len = 0;
 
 	if (policy_file_set)
 		rc = nljson_init_file(&hdl, 0, skip_unknown_attrs, policy_file);
@@ -117,11 +117,14 @@ static void do_encode(void)
 		ssize_t read_len, write_len;
 		size_t consumed, produced;
 
-		read_len = read(in_fd, in_buf + in_buf_offset,
-				sizeof(in_buf) - in_buf_offset);
+		read_len = read(in_fd, in_buf + in_buf_len,
+				sizeof(in_buf) - in_buf_len);
 		if (read_len <= 0)
 			break;
-		while (read_len > 0) {
+
+		in_buf_len += read_len;
+
+		while (in_buf_len > 0) {
 			char *out_buf;
 
 			out_buf = nljson_encode_nla_alloc(hdl, in_buf,
@@ -135,14 +138,14 @@ static void do_encode(void)
 			free(out_buf);
 			if ((size_t) write_len != produced)
 				break;
-			if (consumed < (size_t) read_len) {
-				in_buf_offset = read_len - consumed;
-				memmove(in_buf, in_buf + consumed,
-					in_buf_offset);
-			} else {
-				in_buf_offset = 0;
+			if (consumed > (size_t) in_buf_len) {
+				fprintf(stderr, "Error: Consumed %u bytes "
+					"out of %u", consumed, produced);
+				break;
 			}
-			read_len -= consumed;
+
+			in_buf_len -= consumed;
+			memmove(in_buf, in_buf + consumed, in_buf_len);
 		}
 	}
 out:
