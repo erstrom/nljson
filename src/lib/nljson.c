@@ -222,6 +222,7 @@ static struct nljson_nla_policy *alloc_nljson_nla_policy(nljson_int_t max_attr_t
 	policy = calloc(sizeof(*policy), 1);
 	if (!policy)
 		goto err;
+
 	policy->policy = calloc(sizeof(struct nla_policy), max_attr_type + 1);
 	if (!policy->policy)
 		goto err;
@@ -288,7 +289,7 @@ static void free_id_to_str_map(char **id_to_str_map, size_t len)
 		if (id_to_str_map[i])
 			free(id_to_str_map[i]);
 	}
-	free(*id_to_str_map);
+	free(id_to_str_map);
 }
 
 static void free_nested_policy(struct nljson_nla_policy **policy, size_t len)
@@ -340,7 +341,7 @@ int nljson_init(nljson_t **hdl,
 		struct nljson_error *error)
 {
 	int rc;
-	json_t *policy_json_obj;
+	json_t *policy_json_obj = NULL;
 	json_error_t json_error;
 
 	memset(error, 0, sizeof(*error));
@@ -372,8 +373,12 @@ int nljson_init(nljson_t **hdl,
 	if (nljson_flags & NLJSON_FLAG_SKIP_UNKNOWN_ATTRS)
 		(*hdl)->skip_unknown_attrs = true;
 
+	if (policy_json_obj)
+		json_decref(policy_json_obj);
 	return 0;
 err:
+	if (policy_json_obj)
+		json_decref(policy_json_obj);
 	free_handle(hdl);
 	return -1;
 }
@@ -385,7 +390,7 @@ int nljson_init_file(nljson_t **hdl,
 		     struct nljson_error *error)
 {
 	int rc;
-	json_t *policy_json_obj;
+	json_t *policy_json_obj = NULL;
 	json_error_t json_error;
 
 	memset(error, 0, sizeof(*error));
@@ -418,8 +423,12 @@ int nljson_init_file(nljson_t **hdl,
 	if (nljson_flags & NLJSON_FLAG_SKIP_UNKNOWN_ATTRS)
 		(*hdl)->skip_unknown_attrs = true;
 
+	if (policy_json_obj)
+		json_decref(policy_json_obj);
 	return 0;
 err:
+	if (policy_json_obj)
+		json_decref(policy_json_obj);
 	free_handle(hdl);
 	return -1;
 }
@@ -432,7 +441,7 @@ int nljson_init_cb(nljson_t **hdl,
 		   struct nljson_error *error)
 {
 	int rc;
-	json_t *policy_json_obj;
+	json_t *policy_json_obj = NULL;
 	json_error_t json_error;
 
 	memset(error, 0, sizeof(*error));
@@ -466,8 +475,12 @@ int nljson_init_cb(nljson_t **hdl,
 	if (nljson_flags & NLJSON_FLAG_SKIP_UNKNOWN_ATTRS)
 		(*hdl)->skip_unknown_attrs = true;
 
+	if (policy_json_obj)
+		json_decref(policy_json_obj);
 	return 0;
 err:
+	if (policy_json_obj)
+		json_decref(policy_json_obj);
 	free_handle(hdl);
 	return -1;
 }
