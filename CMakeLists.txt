@@ -15,6 +15,7 @@ set(NLJSON_TOOLS_VERSION "0.1")
 option(NLJSON_BUILD_SHARED_LIB "Build shared library." ON)
 option(NLJSON_BUILD_ENCODER "Build encoder program." ON)
 option(NLJSON_BUILD_DECODER "Build decoder program." ON)
+option(NLJSON_DEBUG "Add debug info to binaries." OFF)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
@@ -111,6 +112,10 @@ endif()
 
 if (CMAKE_COMPILER_IS_GNUCC)
 	add_definitions(-Wall -Wextra -Wdeclaration-after-statement)
+endif()
+
+if (NLJSON_DEBUG)
+	add_definitions(-g -O0)
 endif()
 
 # Allow the user to override installation directories.
