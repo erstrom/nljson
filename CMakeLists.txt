@@ -13,6 +13,7 @@ set(NLJSON_TOOLS_VERSION "0.1")
 # nljson configuration
 #
 option(NLJSON_BUILD_SHARED_LIB "Build shared library." ON)
+option(NLJSON_BUILD_ENCODER "Build encoder program." ON)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
@@ -37,9 +38,14 @@ include_directories(${JANSSON_INCLUDE_DIRS})
 
 # Check for h-files
 check_include_files(stdint.h HAVE_STDINT_H)
+check_include_files(stdbool.h HAVE_STDBOOL_H)
 check_include_files(stdio.h HAVE_STDIO_H)
 check_include_files(stdlib.h HAVE_STDLIB_H)
+check_include_files(string.h HAVE_STRING_H)
 check_include_files(errno.h HAVE_ERRNO_H)
+if (NLJSON_BUILD_ENCODER)
+	check_include_files(getopt.h HAVE_GETOPT_H)
+endif()
 
 # Check sizes of data types
 check_type_size(int64_t INT64_T)
@@ -67,6 +73,7 @@ file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/include/nljson.h
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/include ${CMAKE_CURRENT_BINARY_DIR}/src)
 
 set(NLJSON_LIB_SRC src/lib/nljson.c src/lib/nljson_encode.c)
+set(NLJSON_ENCODER_SRC src/tools/nljson-encoder.c)
 set(NLJSON_HDR_PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include/nljson.h)
 
 if(NLJSON_BUILD_SHARED_LIB)
@@ -85,6 +92,13 @@ else()
 endif()
 
 target_link_libraries(nljson ${JANSSON_LIBRARIES} ${LIBNL_LIBRARIES})
+
+if (NLJSON_BUILD_ENCODER)
+	add_executable(nljson-encoder
+	               ${NLJSON_ENCODER_SRC}
+	               ${NLJSON_HDR_PUBLIC})
+	target_link_libraries(nljson-encoder nljson)
+endif()
 
 if (CMAKE_COMPILER_IS_GNUCC)
 	add_definitions(-Wall -Wextra -Wdeclaration-after-statement)
@@ -116,6 +130,11 @@ install(TARGETS nljson
         ARCHIVE DESTINATION "${NLJSON_INSTALL_LIB_DIR}" COMPONENT lib
         RUNTIME DESTINATION "${NLJSON_INSTALL_BIN_DIR}" COMPONENT bin
         PUBLIC_HEADER DESTINATION "${NLJSON_INSTALL_INCLUDE_DIR}" COMPONENT dev)
+
+if (NLJSON_BUILD_ENCODER)
+	install(TARGETS nljson-encoder
+	        RUNTIME DESTINATION "${NLJSON_INSTALL_BIN_DIR}" COMPONENT bin)
+endif()
 
 # Install pkg-config file
 install(FILES
