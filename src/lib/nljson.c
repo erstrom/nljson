@@ -38,7 +38,8 @@ struct policy_list_item {
 	struct policy_list_item *next;
 	nljson_int_t data_type;
 	nljson_int_t attr_type;
-	nljson_int_t attr_len;
+	nljson_int_t maxlen;
+	nljson_int_t minlen;
 	char *key;
 	json_t *nested_policy;
 };
@@ -89,9 +90,9 @@ static struct policy_list_item *create_attr_list(json_t *policy_json,
 	prev_item = &head;
 
 	json_object_foreach(policy_json, key, value) {
-		json_t *data_type_json, *attr_type_json, *attr_len_json,
-		       *nested_policy_json;
-		nljson_int_t data_type, attr_type, attr_len;
+		json_t *data_type_json, *attr_type_json, *maxlen_json,
+		       *minlen_json, *nested_policy_json;
+		nljson_int_t data_type, attr_type, maxlen, minlen;
 		const char *data_type_str;
 
 		struct policy_list_item *cur_item;
@@ -110,15 +111,26 @@ static struct policy_list_item *create_attr_list(json_t *policy_json,
 		data_type_str = json_string_value(data_type_json);
 		data_type = get_nl_data_type_from_string(data_type_str);
 
-		attr_len_json = json_object_get(value, POLICY_ATTR_LENGTH_STR);
-		if (attr_len_json) {
-			/* attr_len is not mandatory */
-			if (!json_is_integer(attr_len_json))
+		maxlen_json = json_object_get(value, POLICY_MAX_LENGTH_STR);
+		if (maxlen_json) {
+			/* maxlen is not mandatory */
+			if (!json_is_integer(maxlen_json))
 				goto err;
 
-			attr_len = json_integer_value(attr_len_json);
+			maxlen = json_integer_value(maxlen_json);
 		} else {
-			attr_len = 0;
+			maxlen = 0;
+		}
+
+		minlen_json = json_object_get(value, POLICY_MIN_LENGTH_STR);
+		if (minlen_json) {
+			/* minlen is not mandatory */
+			if (!json_is_integer(minlen_json))
+				goto err;
+
+			minlen = json_integer_value(minlen_json);
+		} else {
+			minlen = 0;
 		}
 
 		if (attr_type > *max_attr_type)
@@ -129,7 +141,7 @@ static struct policy_list_item *create_attr_list(json_t *policy_json,
 				*max_nested_attr_type = attr_type;
 
 			/* In case of a nested attribute,
-			 * there must be a "policy" key
+			 * there must be a "nested" key
 			 */
 			nested_policy_json = json_object_get(value, POLICY_STR);
 			if (!nested_policy_json)
@@ -143,7 +155,8 @@ static struct policy_list_item *create_attr_list(json_t *policy_json,
 			goto err;
 		cur_item->attr_type = attr_type;
 		cur_item->data_type = data_type;
-		cur_item->attr_len = attr_len;
+		cur_item->maxlen = maxlen;
+		cur_item->minlen = minlen;
 		cur_item->nested_policy = nested_policy_json;
 		cur_item->key = calloc(1, strlen(key));
 		if (!cur_item->key)
@@ -174,7 +187,8 @@ static int populate_policy_and_free_list(struct policy_list_item *head,
 		struct policy_list_item *tmp;
 
 		policy->policy[iter->attr_type].type = iter->data_type;
-		policy->policy[iter->attr_type].maxlen = iter->attr_len;
+		policy->policy[iter->attr_type].maxlen = iter->maxlen;
+		policy->policy[iter->attr_type].minlen = iter->minlen;
 		policy->id_to_str_map[iter->attr_type] = iter->key;
 
 		if (iter->nested_policy) {
