@@ -93,6 +93,9 @@ endif()
 # Prepare build / define targets
 #
 
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/lib/nljson_config.h.in
+               ${CMAKE_CURRENT_BINARY_DIR}/include/nljson_config.h)
+
 # Copy the nljson.h file to the build dir
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/include/nljson.h
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/include/)
