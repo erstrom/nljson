@@ -1,0 +1,10 @@
+prefix=@prefix@
+exec_prefix=${prefix}
+libdir=@INSTALL_LIB_DIR@
+includedir=@INSTALL_INCLUDE_DIR@
+
+Name: nljson
+Description: Library for converting netlink attributes to/from JSON
+Version: @NLJSON_VERSION@
+Libs: -L${libdir} -lnljson
+Cflags: -I${includedir}
