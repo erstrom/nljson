@@ -38,34 +38,37 @@ static json_t *create_attr_object(struct nlattr *attr, int data_type)
 	if (!obj)
 		goto err;
 
-	json_object_set_new(obj, "data_type", json_string_nocheck(data_type_strings[data_type]));
-	json_object_set_new(obj, "type", json_integer(nla_type(attr)));
-	json_object_set_new(obj, "length", json_integer(nla_len(attr)));
+	json_object_set_new(obj, DATA_TYPE_STR, json_string_nocheck(data_type_strings[data_type]));
+	json_object_set_new(obj, ATTR_TYPE_STR, json_integer(nla_type(attr)));
+	json_object_set_new(obj, LENGTH_STR, json_integer(nla_len(attr)));
 
 	switch (data_type) {
 	case NLA_U8:
 		data.u8 = nla_get_u8(attr);
-		json_object_set_new(obj, "value", json_integer(data.u8));
+		json_object_set_new(obj, VALUE_STR, json_integer(data.u8));
 		break;
 	case NLA_U16:
 		data.u16 = nla_get_u16(attr);
-		json_object_set_new(obj, "value", json_integer(data.u16));
+		json_object_set_new(obj, VALUE_STR, json_integer(data.u16));
 		break;
 	case NLA_U32:
 		data.u32 = nla_get_u32(attr);
-		json_object_set_new(obj, "value", json_integer(data.u32));
+		json_object_set_new(obj, VALUE_STR, json_integer(data.u32));
 		break;
 	case NLA_U64:
 		data.u64 = nla_get_u64(attr);
-		json_object_set_new(obj, "value", json_integer(data.u64));
+		json_object_set_new(obj, VALUE_STR, json_integer(data.u64));
 		break;
 	case NLA_STRING:
 		data.str = nla_get_string(attr);
-		json_object_set_new(obj, "value", json_string_nocheck(data.str));
+		json_object_set_new(obj, VALUE_STR, json_string_nocheck(data.str));
 		break;
+	case NLA_NESTED:
+	case NLA_UNSPEC:
+	/*Fallthrough*/
 	default:
 		data.unspec = nla_data(attr);
-		json_object_set_new(obj, "value", create_unspec_attr_object((uint8_t *)data.unspec, nla_len(attr)));
+		json_object_set_new(obj, VALUE_STR, create_unspec_attr_object((uint8_t *)data.unspec, nla_len(attr)));
 		break;
 	}
 
@@ -77,7 +80,8 @@ err:
 }
 
 /* buf is assumed to point directly at the attribute stream */
-static json_t *parse_nl_attrs(uint8_t *buf, size_t buflen, nljson_t *hdl)
+static json_t *parse_nl_attrs(uint8_t *buf, size_t buflen, nljson_t *hdl,
+			      size_t *bytes_consumed)
 {
 	struct nlattr *cur_attr;
 	json_t *obj = NULL, *cur_attr_obj;
@@ -94,19 +98,26 @@ static json_t *parse_nl_attrs(uint8_t *buf, size_t buflen, nljson_t *hdl)
 		attr_type_to_str_map = hdl->id_to_str_map;
 	}
 
+	*bytes_consumed = 0;
 	obj = json_object();
+	if (!obj)
+		return NULL;
+
 	while (nla_ok(cur_attr, remaining)) {
 		int data_type = NLA_UNSPEC, type = nla_type(cur_attr);
 
-		if (policy && type <= max_attr_type)
+		*bytes_consumed += (nla_len(cur_attr) + NLA_HDR_LEN);
+		if (policy && (type <= max_attr_type))
 			data_type = policy[type].type;
 		cur_attr_obj = create_attr_object(cur_attr, data_type);
 		if (cur_attr_obj) {
-			if (attr_type_to_str_map && attr_type_to_str_map[type]) {
+			if (attr_type_to_str_map && (type <= max_attr_type) &&
+			    attr_type_to_str_map[type]) {
 				json_object_set(obj, attr_type_to_str_map[type],
 						cur_attr_obj);
 			} else {
 				char tmp[20];
+
 				snprintf(tmp, sizeof(tmp), "UNKNOWN_ATTR_%d", type);
 				json_object_set(obj, tmp, cur_attr_obj);
 			}
@@ -147,7 +158,8 @@ int nljson_encode_nla(nljson_t *hdl,
 		.output_len = output_len,
 	};
 
-	obj = parse_nl_attrs((uint8_t *) nla_stream, nla_stream_len, hdl);
+	obj = parse_nl_attrs((uint8_t *) nla_stream, nla_stream_len, hdl,
+			     bytes_consumed);
 	if (!obj)
 		return -EINVAL;
 
@@ -155,7 +167,6 @@ int nljson_encode_nla(nljson_t *hdl,
 				json_format_flags);
 	json_decref(obj);
 	*bytes_produced = cb_data.bytes_consumed;
-	*bytes_consumed = nla_stream_len;
 	return rc;
 }
 
@@ -169,14 +180,14 @@ char *nljson_encode_nla_alloc(nljson_t *hdl,
 	json_t *obj;
 	char *output;
 
-	obj = parse_nl_attrs((uint8_t *) nla_stream, nla_stream_len, hdl);
+	obj = parse_nl_attrs((uint8_t *) nla_stream, nla_stream_len, hdl,
+			     bytes_consumed);
 	if (!obj)
 		return NULL;
 
 	output = json_dumps(obj, json_format_flags);
 	json_decref(obj);
 	*bytes_produced = strlen(output);
-	*bytes_consumed = nla_stream_len;
 	return output;
 }
 
@@ -194,14 +205,14 @@ int nljson_encode_nla_cb(nljson_t *hdl,
 	if (!encode_cb)
 		return -EINVAL;
 
-	obj = parse_nl_attrs((uint8_t *) nla_stream, nla_stream_len, hdl);
+	obj = parse_nl_attrs((uint8_t *) nla_stream, nla_stream_len, hdl,
+			     bytes_consumed);
 	if (!obj)
 		return -EINVAL;
 
 	rc = json_dump_callback(obj, encode_cb, cb_data,
 				json_format_flags);
 	json_decref(obj);
-	*bytes_consumed = nla_stream_len;
 	return rc;
 }
 
