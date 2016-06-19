@@ -1,0 +1,12 @@
+{
+    "NL80211_ATTR_VENDOR_DATA": {
+        "data_type": "NLA_NESTED",
+        "nla_type": 197,
+        "nested": {
+            "QCA_WLAN_VENDOR_ATTR_TEST": {
+                "data_type": "NLA_U32",
+                "nla_type": 8
+            }
+        }
+    }
+}
