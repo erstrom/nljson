@@ -96,6 +96,8 @@ static void do_decode(void)
 {
 	int rc = 0, in_fd, out_fd;
 	size_t in_buf_len = 0;
+	struct nljson_error error;
+	bool decode_error = false;
 
 	if (input_file_set)
 		in_fd = open(input_file, O_RDONLY);
@@ -135,7 +137,6 @@ static void do_decode(void)
 
 		while (in_buf_len > 0) {
 			size_t i;
-			struct nljson_error error;
 
 			rc = nljson_decode_nla(in_buf, out_buf,
 					       sizeof(out_buf),
@@ -143,8 +144,21 @@ static void do_decode(void)
 					       json_format_flags,
 					       &error);
 
-			if (rc || (produced == 0) || (consumed == 0))
+			if (rc) {
+				/* We don't print the error here since the
+				 * error could be caused by an incomplete
+				 * JSON string and we could get more data
+				 * in the next iteration.
+				 */
+				decode_error = true;
 				break;
+			}
+
+			decode_error = false;
+
+			if ((produced == 0) || (consumed == 0))
+				break;
+
 			if (ascii_output)
 				write_len = write_ascii(out_fd, out_buf,
 							produced);
@@ -178,6 +192,10 @@ static void do_decode(void)
 		if (eof_reached)
 			break;
 	}
+
+	if (decode_error)
+		/* The last iteration was an error */
+		fprintf(stderr, "Decoding error: %s\n", error.err_msg);
 out:
 	if (in_fd > 0)
 		close(in_fd);

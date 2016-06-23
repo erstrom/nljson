@@ -85,13 +85,16 @@ static void do_encode(void)
 	nljson_t *hdl = NULL;
 	size_t in_buf_len = 0;
 	struct nljson_error error;
+	bool encode_error = false;
 
 	if (policy_file_set)
 		rc = nljson_init_file(&hdl, 0, skip_unknown_attrs,
 				      policy_file, &error);
 
-	if (rc)
+	if (rc) {
+		fprintf(stderr, "Init error: %s\n", error.err_msg);
 		goto out;
+	}
 
 	if (input_file_set)
 		in_fd = open(input_file, O_RDONLY);
@@ -138,7 +141,19 @@ static void do_encode(void)
 							  json_format_flags,
 							  &error);
 
-			if ((!out_buf) || (produced == 0) || (consumed == 0))
+			if (!out_buf) {
+				/* We don't print the error here since the
+				 * error could be caused by an incomplete
+				 * input buffer and we could get more data
+				 * in the next iteration.
+				 */
+				encode_error = true;
+				break;
+			}
+
+			encode_error = false;
+
+			if ((produced == 0) || (consumed == 0))
 				break;
 
 			write_len = write(out_fd, out_buf, produced);
@@ -158,6 +173,10 @@ static void do_encode(void)
 		if (eof_reached)
 			break;
 	}
+
+	if (encode_error)
+		/* The last iteration was an error */
+		fprintf(stderr, "Encoding error: %s\n", error.err_msg);
 out:
 	if (hdl)
 		nljson_deinit(&hdl);
