@@ -370,8 +370,7 @@ int nljson_init(nljson_t **hdl,
 		}
 	}
 
-	if (nljson_flags & NLJSON_FLAG_SKIP_UNKNOWN_ATTRS)
-		(*hdl)->skip_unknown_attrs = true;
+	(*hdl)->encode_flags = nljson_flags;
 
 	if (policy_json_obj)
 		json_decref(policy_json_obj);
@@ -420,8 +419,7 @@ int nljson_init_file(nljson_t **hdl,
 		}
 	}
 
-	if (nljson_flags & NLJSON_FLAG_SKIP_UNKNOWN_ATTRS)
-		(*hdl)->skip_unknown_attrs = true;
+	(*hdl)->encode_flags = nljson_flags;
 
 	if (policy_json_obj)
 		json_decref(policy_json_obj);
@@ -472,8 +470,7 @@ int nljson_init_cb(nljson_t **hdl,
 		}
 	}
 
-	if (nljson_flags & NLJSON_FLAG_SKIP_UNKNOWN_ATTRS)
-		(*hdl)->skip_unknown_attrs = true;
+	(*hdl)->encode_flags = nljson_flags;
 
 	if (policy_json_obj)
 		json_decref(policy_json_obj);

@@ -31,6 +31,11 @@
 #define NLJSON_FLAG_SKIP_UNKNOWN_ATTRS (1)
 
 /**
+ * When this flag is set, the encoder will add a time stamp to each
+ * encoded message. */
+#define NLJSON_FLAG_ADD_TIMESTAMP (2)
+
+/**
  * nljson handle.
  */
 typedef struct _nljson nljson_t;

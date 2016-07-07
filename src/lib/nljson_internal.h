@@ -42,6 +42,8 @@
 #define VALUE_STR_LEN             (sizeof(VALUE_STR) - 1)
 #define POLICY_STR                ("nested")
 #define POLICY_STR_LEN            (sizeof(POLICY_STR) - 1)
+#define TS_STR                    ("timestamp")
+#define TS_STR_LEN                (sizeof(TS_STR) - 1)
 
 #define NLA_HDR_LEN 4
 
@@ -55,7 +57,7 @@ struct nljson_nla_policy {
 
 struct _nljson {
 	struct nljson_nla_policy *policy;
-	bool skip_unknown_attrs;
+	uint32_t encode_flags;
 };
 
 extern const char *data_type_strings[NLA_TYPE_MAX + 1];

@@ -18,6 +18,8 @@
 
 #include "nljson.h"
 #include "nljson_internal.h"
+#include <sys/time.h>
+#include <time.h>
 
 struct local_encode_cb_data {
 	char *output;
@@ -27,7 +29,35 @@ struct local_encode_cb_data {
 
 static json_t *parse_nl_attrs(uint8_t *buf, size_t buflen,
 			      struct nljson_nla_policy *nljson_policy,
-			      size_t *bytes_consumed, bool skip_unknown_attrs);
+			      size_t *bytes_consumed, uint32_t flags);
+
+static void add_timestamp(json_t *obj)
+{
+	int rc;
+	struct timeval tval;
+	struct tm *tm;
+	char timestr[256];
+	size_t timestr_len;
+
+	rc = gettimeofday(&tval, NULL);
+	if (rc)
+		return;
+
+	tm = localtime(&tval.tv_sec);
+	if (!tm)
+		return;
+
+	timestr_len = strftime(timestr, sizeof(timestr), "%F %T", tm);
+	if (!timestr_len)
+		return;
+
+	rc = snprintf(timestr + timestr_len, sizeof(timestr) - timestr_len,
+		      ":%03u", (uint32_t) tval.tv_usec / 1000);
+	if (rc < 0)
+		return;
+
+	json_object_set_new(obj, TS_STR, json_string_nocheck(timestr));
+}
 
 static json_t *create_unspec_attr_object(const uint8_t *data, size_t data_len)
 {
@@ -46,7 +76,7 @@ static json_t *create_unspec_attr_object(const uint8_t *data, size_t data_len)
 
 static json_t *create_attr_object(struct nlattr *attr, int data_type,
 				  struct nljson_nla_policy *policy,
-				  bool skip_unknown_attrs)
+				  uint32_t flags)
 {
 	json_t *obj;
 	union {
@@ -95,7 +125,7 @@ static json_t *create_attr_object(struct nlattr *attr, int data_type,
 		nested = parse_nl_attrs(nla_data(attr), nla_len(attr),
 					policy,
 					&bytes_consumed,
-					skip_unknown_attrs);
+					flags);
 		if (!nested || (bytes_consumed != (size_t) nla_len(attr)))
 			goto err;
 
@@ -126,7 +156,7 @@ err:
 /* buf is assumed to point directly at the attribute stream */
 static json_t *parse_nl_attrs(uint8_t *buf, size_t buflen,
 			      struct nljson_nla_policy *nljson_policy,
-			      size_t *bytes_consumed, bool skip_unknown_attrs)
+			      size_t *bytes_consumed, uint32_t flags)
 {
 	struct nlattr *cur_attr;
 	json_t *obj = NULL, *cur_attr_obj;
@@ -151,6 +181,9 @@ static json_t *parse_nl_attrs(uint8_t *buf, size_t buflen,
 	if (!obj)
 		return NULL;
 
+	if (flags & NLJSON_FLAG_ADD_TIMESTAMP)
+		add_timestamp(obj);
+
 	while (nla_ok(cur_attr, remaining)) {
 		int data_type = NLA_UNSPEC, type = nla_type(cur_attr);
 		struct nljson_nla_policy *cur_nested = NULL;
@@ -162,13 +195,13 @@ static json_t *parse_nl_attrs(uint8_t *buf, size_t buflen,
 			cur_nested = nested[type];
 		cur_attr_obj = create_attr_object(cur_attr, data_type,
 						  cur_nested,
-						  skip_unknown_attrs);
+						  flags);
 		if (cur_attr_obj) {
 			if (attr_type_to_str_map && (type <= max_attr_type) &&
 			    attr_type_to_str_map[type]) {
 				json_object_set(obj, attr_type_to_str_map[type],
 						cur_attr_obj);
-			} else if (!skip_unknown_attrs) {
+			} else if (!(flags & NLJSON_FLAG_SKIP_UNKNOWN_ATTRS)) {
 				char tmp[20];
 
 				snprintf(tmp, sizeof(tmp), "UNKNOWN_ATTR_%d", type);
@@ -208,7 +241,7 @@ int nljson_encode_nla(nljson_t *hdl,
 	json_t *obj;
 	int rc;
 	struct nljson_nla_policy *policy = NULL;
-	bool skip_unknown_attrs = false;
+	uint32_t encode_flags = 0;
 	struct local_encode_cb_data cb_data = {
 		.output = output,
 		.output_len = output_len,
@@ -218,7 +251,7 @@ int nljson_encode_nla(nljson_t *hdl,
 
 	if (hdl) {
 		policy = hdl->policy;
-		skip_unknown_attrs = hdl->skip_unknown_attrs;
+		encode_flags = hdl->encode_flags;
 	}
 
 	/*We add JSON_PRESERVE_ORDER in order to make sure the encoded
@@ -227,7 +260,7 @@ int nljson_encode_nla(nljson_t *hdl,
 	json_format_flags |= JSON_PRESERVE_ORDER;
 
 	obj = parse_nl_attrs((uint8_t *) nla_stream, nla_stream_len,
-			     policy, bytes_consumed, skip_unknown_attrs);
+			     policy, bytes_consumed, encode_flags);
 	if (!obj) {
 		SET_ERR(error, EINVAL, "Parse error");
 		return -1;
@@ -259,13 +292,13 @@ char *nljson_encode_nla_alloc(nljson_t *hdl,
 	json_t *obj;
 	char *output;
 	struct nljson_nla_policy *policy = NULL;
-	bool skip_unknown_attrs = false;
+	uint32_t encode_flags = 0;
 
 	memset(error, 0, sizeof(*error));
 
 	if (hdl) {
 		policy = hdl->policy;
-		skip_unknown_attrs = hdl->skip_unknown_attrs;
+		encode_flags = hdl->encode_flags;
 	}
 
 	/*We add JSON_PRESERVE_ORDER in order to make sure the encoded
@@ -274,7 +307,7 @@ char *nljson_encode_nla_alloc(nljson_t *hdl,
 	json_format_flags |= JSON_PRESERVE_ORDER;
 
 	obj = parse_nl_attrs((uint8_t *) nla_stream, nla_stream_len,
-			     policy, bytes_consumed, skip_unknown_attrs);
+			     policy, bytes_consumed, encode_flags);
 	if (!obj) {
 		SET_ERR(error, EINVAL, "Parse error");
 		return NULL;
@@ -308,13 +341,13 @@ int nljson_encode_nla_cb(nljson_t *hdl,
 	json_t *obj;
 	int rc;
 	struct nljson_nla_policy *policy = NULL;
-	bool skip_unknown_attrs = false;
+	uint32_t encode_flags = 0;
 
 	memset(error, 0, sizeof(*error));
 
 	if (hdl) {
 		policy = hdl->policy;
-		skip_unknown_attrs = hdl->skip_unknown_attrs;
+		encode_flags = hdl->encode_flags;
 	}
 
 	/*We add JSON_PRESERVE_ORDER in order to make sure the encoded
@@ -328,7 +361,7 @@ int nljson_encode_nla_cb(nljson_t *hdl,
 	}
 
 	obj = parse_nl_attrs((uint8_t *) nla_stream, nla_stream_len,
-			     policy, bytes_consumed, skip_unknown_attrs);
+			     policy, bytes_consumed, encode_flags);
 	if (!obj) {
 		SET_ERR(error, EINVAL, "Parse error");
 		return -1;
