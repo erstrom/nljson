@@ -32,16 +32,12 @@
 #include <nljson_tools_config.h>
 
 #define IN_BUF_LEN (1024)
+#define FILE_NAME_LEN (256)
 
-static char policy_file[256];
-static char input_file[256];
-static char output_file[256];
-
+static char *policy_file, *input_file, *output_file;
 static uint8_t in_buf[IN_BUF_LEN];
-
 static uint32_t json_format_flags;
-static bool policy_file_set, input_file_set, output_file_set,
-	    skip_unknown_attrs;
+static uint32_t nljson_flags;
 
 static void print_usage(const char *argv0)
 {
@@ -66,6 +62,7 @@ static void print_usage(const char *argv0)
 	fprintf(stderr, "                     If omitted, the JSON output will be written to stdout.\n");
 	fprintf(stderr, "  -s, --skip-unknown Skip all unknown attributes (attributes not present in\n");
 	fprintf(stderr, "                     the policy file).\n");
+	fprintf(stderr, "  -t, --timestamps   Add timestamps to JSON output.\n");
 	fprintf(stderr, "  --version          Print version info and exit.\n");
 	fprintf(stderr, "\n");
 }
@@ -87,8 +84,8 @@ static void do_encode(void)
 	struct nljson_error error;
 	bool encode_error = false;
 
-	if (policy_file_set)
-		rc = nljson_init_file(&hdl, 0, skip_unknown_attrs,
+	if (policy_file || nljson_flags)
+		rc = nljson_init_file(&hdl, 0, nljson_flags,
 				      policy_file, &error);
 
 	if (rc) {
@@ -96,7 +93,7 @@ static void do_encode(void)
 		goto out;
 	}
 
-	if (input_file_set)
+	if (input_file)
 		in_fd = open(input_file, O_RDONLY);
 	else
 		in_fd = 0;
@@ -104,7 +101,7 @@ static void do_encode(void)
 	if (in_fd < 0)
 		goto out;
 
-	if (output_file_set)
+	if (output_file)
 		out_fd = open(output_file, O_WRONLY);
 	else
 		out_fd = 1;
@@ -184,6 +181,12 @@ out:
 		close(in_fd);
 	if (out_fd > 1)
 		close(out_fd);
+	if (policy_file)
+		free(policy_file);
+	if (input_file)
+		free(input_file);
+	if (output_file)
+		free(output_file);
 }
 
 int main(int argc, char *argv[])
@@ -197,15 +200,20 @@ int main(int argc, char *argv[])
 		{"input", required_argument, 0, 'i'},
 		{"output", required_argument, 0, 'o'},
 		{"skip-unknown", no_argument, 0, 's'},
+		{"timestamps", no_argument, 0, 't'},
 		{"version", no_argument, 0, 1000},
 		{NULL, 0, 0, 0},
 	};
 
-	while ((opt = getopt_long(argc, argv, "hp:f:i:o:s", long_opts, &optind)) != -1) {
+	while ((opt = getopt_long(argc, argv, "hp:f:i:o:st", long_opts, &optind)) != -1) {
 		switch (opt) {
 		case 'p':
-			strncpy(policy_file, optarg, sizeof(policy_file));
-			policy_file_set = true;
+			policy_file = calloc(FILE_NAME_LEN, 1);
+			if (!policy_file) {
+				fprintf(stderr, "calloc returned NULL!\n");
+				return -1;
+			}
+			strncpy(policy_file, optarg, FILE_NAME_LEN);
 			break;
 		case 'f':
 			json_format_flags = strtoul(optarg, &tmp, 0);
@@ -216,15 +224,26 @@ int main(int argc, char *argv[])
 			}
 			break;
 		case 'i':
-			strncpy(input_file, optarg, sizeof(input_file));
-			input_file_set = true;
+			input_file = calloc(FILE_NAME_LEN, 1);
+			if (!input_file) {
+				fprintf(stderr, "calloc returned NULL!\n");
+				return -1;
+			}
+			strncpy(input_file, optarg, FILE_NAME_LEN);
 			break;
 		case 'o':
-			strncpy(output_file, optarg, sizeof(output_file));
-			output_file_set = true;
+			output_file = calloc(FILE_NAME_LEN, 1);
+			if (!output_file) {
+				fprintf(stderr, "calloc returned NULL!\n");
+				return -1;
+			}
+			strncpy(output_file, optarg, FILE_NAME_LEN);
 			break;
 		case 's':
-			skip_unknown_attrs = true;
+			nljson_flags |= NLJSON_FLAG_SKIP_UNKNOWN_ATTRS;
+			break;
+		case 't':
+			nljson_flags |= NLJSON_FLAG_ADD_TIMESTAMP;
 			break;
 		case 1000:
 			print_version();
