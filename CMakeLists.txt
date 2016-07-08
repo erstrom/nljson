@@ -5,9 +5,9 @@ include(CheckIncludeFiles)
 include(CheckTypeSize)
 include(FindPkgConfig)
 
-set(NLJSON_VERSION "0.1")
+set(NLJSON_VERSION "0.2")
 set(NLJSON_SOVERSION 0)
-set(NLJSON_TOOLS_VERSION "0.1")
+set(NLJSON_TOOLS_VERSION "0.2")
 
 #
 # nljson configuration
