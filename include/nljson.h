@@ -22,7 +22,16 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/**
+ * \mainpage nljson API
+ */
+
 #define NLJSON_ERR_STR_LEN (256)
+
+/**
+ * \defgroup nljson_flags nljson flags
+ * @{
+ */
 
 /**
  * When this flag is set, the encoder will skip all unknown attributes,
@@ -34,6 +43,13 @@
  * When this flag is set, the encoder will add a time stamp to each
  * encoded message. */
 #define NLJSON_FLAG_ADD_TIMESTAMP (2)
+
+/** @} */
+
+/**
+ * \defgroup data_types nljson data types
+ * @{
+ */
 
 /**
  * nljson handle.
@@ -58,7 +74,12 @@ struct nljson_error {
 	int err_code;
 };
 
+/** @} */
+
 /**
+ * \defgroup init_functions Init family of functions
+ * @{
+ *
  * Init family of functions.
  *
  * Initializes an nljson handle.
@@ -73,29 +94,29 @@ struct nljson_error {
 /**
  * Init function reading the nla JSON policy from a buffer.
  *
- * @arg hdl               Handle that will be allocated
+ * @param[inout] hdl            Handle that will be allocated
  *
- * @arg json_format_flags Flags for the JSON decoding of the nla policy.
- *                        Passed directly to the jansson library.
- *                        See jansson documentation for more info.
+ * @param[in] json_format_flags Flags for the JSON decoding of the nla policy.
+ *                              Passed directly to the jansson library.
+ *                              See jansson documentation for more info.
  *
- * @arg nljson_flags      Flags for the JSON encoding of the nla stream.
- *                        See description of each flag for more info.
- *                        These flags will be used by the encode functions
- *                        when called with the handle obtained from this
- *                        function.
+ * @param[in] nljson_flags      Flags for the JSON encoding of the nla stream.
+ *                              See description of each flag for more info.
+ *                              These flags will be used by the encode functions
+ *                              when called with the handle obtained from this
+ *                              function.
  *
- * @arg policy_json       The nla policy definition string.
- *                        Must be a valid JSON string.
- *                        If NULL, the handle will not contain any policy.
- *                        The policy will be used by the encode functions
- *                        when called with the handle obtained from this
- *                        function.
- *                        See description of encode functions for more
- *                        details.
+ * @param[in] policy_json       The nla policy definition string.
+ *                              Must be a valid JSON string.
+ *                              If NULL, the handle will not contain any policy.
+ *                              The policy will be used by the encode functions
+ *                              when called with the handle obtained from this
+ *                              function.
+ *                              See description of encode functions for more
+ *                              details.
  *
- * @arg error             Error output. The struct must be allocated by the
- *                        caller.
+ * @param[out] error            Error output. The struct must be allocated by
+ *                              the caller.
  *
  * @return 0 on success or -1 on error.
  *
@@ -110,29 +131,29 @@ int nljson_init(nljson_t **hdl,
 /**
  * Init function reading the nla JSON policy from a file.
  *
- * @arg hdl               Handle that will be allocated
+ * @param[inout] hdl            Handle that will be allocated
  *
- * @arg json_format_flags Flags for the JSON decoding of the nla policy.
- *                        Passed directly to the jansson library.
- *                        See jansson documentation for more info.
+ * @param[in] json_format_flags Flags for the JSON decoding of the nla policy.
+ *                              Passed directly to the jansson library.
+ *                              See jansson documentation for more info.
  *
- * @arg nljson_flags      Flags for the JSON encoding of the nla stream.
- *                        See description of each flag for more info.
- *                        These flags will be used by the encode functions
- *                        when called with the handle obtained from this
- *                        function.
+ * @param[in] nljson_flags      Flags for the JSON encoding of the nla stream.
+ *                              See description of each flag for more info.
+ *                              These flags will be used by the encode functions
+ *                              when called with the handle obtained from this
+ *                              function.
  *
- * @arg policy_json       The nla policy definition string.
- *                        Must be a valid JSON string.
- *                        The policy will be used by the encode functions
- *                        when called with the handle obtained from this
- *                        function.
- *                        If NULL, the handle will not contain any policy.
- *                        See description of encode functions for more
- *                        details.
+ * @param[in] policy_file       The nla policy definition file.
+ *                              Must contain a valid JSON definition.
+ *                              The policy will be used by the encode functions
+ *                              when called with the handle obtained from this
+ *                              function.
+ *                              If NULL, the handle will not contain any policy.
+ *                              See description of encode functions for more
+ *                              details.
  *
- * @arg error             Error output. The struct must be allocated by the
- *                        caller.
+ * @param[out] error            Error output. The struct must be allocated by
+ *                              the caller.
  *
  * @return 0 on success or -1 on error.
  *
@@ -148,33 +169,33 @@ int nljson_init_file(nljson_t **hdl,
  * Init function using a callback function to read the nla JSON
  * policy.
  *
- * @arg hdl               Handle that will be allocated
+ * @param[inout] hdl            Handle that will be allocated
  *
- * @arg json_format_flags Flags for the JSON decoding of the nla policy.
- *                        Passed directly to the jansson library.
- *                        See jansson documentation for more info.
+ * @param[in] json_format_flags Flags for the JSON decoding of the nla policy.
+ *                              Passed directly to the jansson library.
+ *                              See jansson documentation for more info.
  *
- * @arg nljson_flags      Flags for the JSON encoding of the nla stream.
- *                        See description of each flag for more info.
- *                        These flags will be used by the encode functions
- *                        when called with the handle obtained from this
- *                        function.
+ * @param[in] nljson_flags      Flags for the JSON encoding of the nla stream.
+ *                              See description of each flag for more info.
+ *                              These flags will be used by the encode functions
+ *                              when called with the handle obtained from this
+ *                              function.
  *
- * @arg read_policy_cb    will be called continuously by nljson_init
- *                        when reading the JSON encoded nla policy
- *                        definition.
- *                        The callback is expected to fill buf with
- *                        at most size bytes and return the number
- *                        of bytes written.
- *                        If NULL, no policy definition will be read and
- *                        the handle will not contain any policy.
- *                        See description of encode functions for more
- *                        details.
+ * @param[in] read_policy_cb    will be called continuously by nljson_init
+ *                              when reading the JSON encoded nla policy
+ *                              definition.
+ *                              The callback is expected to fill buf with
+ *                              at most size bytes and return the number
+ *                              of bytes written.
+ *                              If NULL, no policy definition will be read and
+ *                              the handle will not contain any policy.
+ *                              See description of encode functions for more
+ *                              details.
  *
- * @arg cb_data           pointer that will passed to read_policy_cb.
+ * @param[inout] cb_data        pointer that will passed to read_policy_cb.
  *
- * @arg error             Error output. The struct must be allocated by the
- *                        caller.
+ * @param[out] error            Error output. The struct must be allocated by
+ *                              the caller.
  *
  * @return 0 on success or -1 on error.
  *
@@ -187,15 +208,20 @@ int nljson_init_cb(nljson_t **hdl,
 		   void *cb_data,
 		   struct nljson_error *error);
 
+/** @} */
+
 /**
  * De-initializes the nljson handle by freeing all memory allocated
  * by nljson_init and sets the handle pointer to NULL.
  *
- * @arg hdl               The handle that will be freed
+ * @param[inout] hdl               The handle that will be freed
  */
 void nljson_deinit(nljson_t **hdl);
 
 /**
+ * \defgroup encode_functions Encode family of functions
+ * @{
+ *
  * Encode family of functions.
  *
  * These functions will encode a stream of netlink attributes (nla_stream)
@@ -219,30 +245,30 @@ void nljson_deinit(nljson_t **hdl);
  * Encodes a stream of nl attributes and stores the result in output.
  * If output is not big enough, an error will be returned.
  *
- * @arg hdl               The nljson handle. Must be allocated by one
- *                        of the init functions.
+ * @param[inout] hdl            The nljson handle. Must be allocated by one
+ *                              of the init functions.
  *
- * @arg nla_stream        Stream of bytes containing netlink attributes
+ * @param[in] nla_stream        Stream of bytes containing netlink attributes
  *
- * @arg nla_stream_len    The length of the netlink attribute byte stream.
+ * @param[in] nla_stream_len    The length of the netlink attribute byte stream.
  *
- * @arg output            The output buffer the encoded JSON string will
- *                        be written to.
+ * @param[out] output           The output buffer the encoded JSON string will
+ *                              be written to.
  *
- * @arg output_len        The length of the output buffer.
+ * @param[in] output_len        The length of the output buffer.
  *
- * @arg bytes_consumed    The number of bytes read (consumed) from
- *                        nla_stream.
+ * @param[out] bytes_consumed   The number of bytes read (consumed) from
+ *                              nla_stream.
  *
- * @arg bytes_produced    The number of output bytes produced, i.e. the
- *                        length of the JSON output.
+ * @param[out] bytes_produced   The number of output bytes produced, i.e. the
+ *                              length of the JSON output.
  *
- * @arg json_format_flags Flags for the JSON output formatting.
- *                        Passed directly to the jansson library.
- *                        See jansson documentation for more info.
+ * @param[in] json_format_flags Flags for the JSON output formatting.
+ *                              Passed directly to the jansson library.
+ *                              See jansson documentation for more info.
  *
- * @arg error             Error output. The struct must be allocated by the
- *                        caller.
+ * @param[out] error            Error output. The struct must be allocated by
+ *                              the caller.
  *
  * @return 0 on success or -1 on error.
  *
@@ -264,25 +290,25 @@ int nljson_encode_nla(nljson_t *hdl,
  * The caller is responsible for deallocating the buffer.
  * In case of error, NULL will be returned.
  *
- * @arg hdl               The nljson handle. Must be allocated by one
- *                        of the init functions.
+ * @param[inout] hdl            The nljson handle. Must be allocated by one
+ *                              of the init functions.
  *
- * @arg nla_stream        Stream of bytes containing netlink attributes
+ * @param[in] nla_stream        Stream of bytes containing netlink attributes
  *
- * @arg nla_stream_len    The length of the netlink attribute byte stream.
+ * @param[in] nla_stream_len    The length of the netlink attribute byte stream.
  *
- * @arg bytes_consumed    The number of bytes read (consumed) from
- *                        nla_stream.
+ * @param[out] bytes_consumed   The number of bytes read (consumed) from
+ *                              nla_stream.
  *
- * @arg bytes_produced    The number of output bytes produced, i.e. the
- *                        length of the JSON output.
+ * @param[out] bytes_produced   The number of output bytes produced, i.e. the
+ *                              length of the JSON output.
  *
- * @arg json_format_flags Flags for the JSON output formatting.
- *                        Passed directly to the jansson library.
- *                        See jansson documentation for more info.
+ * @param[in] json_format_flags Flags for the JSON output formatting.
+ *                              Passed directly to the jansson library.
+ *                              See jansson documentation for more info.
  *
- * @arg error             Error output. The struct must be allocated by the
- *                        caller.
+ * @param[out] error            Error output. The struct must be allocated by
+ *                              the caller.
  *
  * @return pointer to output buffer on success or NULL on error.
  *
@@ -300,27 +326,27 @@ char *nljson_encode_nla_alloc(nljson_t *hdl,
  * Similar to nljson_encode_nla but the output is passed (in chunks)
  * to the callback encode_cb.
  *
- * @arg hdl               The nljson handle. Must be allocated by one
- *                        of the init functions.
+ * @param[inout] hdl            The nljson handle. Must be allocated by one
+ *                              of the init functions.
  *
- * @arg nla_stream        Stream of bytes containing netlink attributes
+ * @param[in] nla_stream        Stream of bytes containing netlink attributes
  *
- * @arg nla_stream_len    The length of the netlink attribute byte stream.
+ * @param[in] nla_stream_len    The length of the netlink attribute byte stream.
  *
- * @arg bytes_consumed    The number of bytes read (consumed) from
- *                        nla_stream.
+ * @param[out] bytes_consumed   The number of bytes read (consumed) from
+ *                              nla_stream.
  *
- * @arg encode_cb         will be called continuously when writing
- *                        the JSON encoded nla output.
+ * @param[in] encode_cb         will be called continuously when writing
+ *                              the JSON encoded nla output.
  *
- * @arg cb_data           pointer that will passed to encode_cb.
+ * @param[inout] cb_data        pointer that will passed to encode_cb.
  *
- * @arg json_format_flags Flags for the JSON output formatting.
- *                        Passed directly to the jansson library.
- *                        See jansson documentation for more info.
+ * @param[in] json_format_flags Flags for the JSON output formatting.
+ *                              Passed directly to the jansson library.
+ *                              See jansson documentation for more info.
  *
- * @arg error             Error output. The struct must be allocated by the
- *                        caller.
+ * @param[out] error            Error output. The struct must be allocated by
+ *                              the caller.
  *
  * @return 0 on success or -1 on error.
  *
@@ -337,7 +363,12 @@ int nljson_encode_nla_cb(nljson_t *hdl,
 			 uint32_t json_format_flags,
 			 struct nljson_error *error);
 
+/** @} */
+
 /**
+ * \defgroup decode_functions Decode family of functions
+ * @{
+ *
  * Decode family of functions.
  *
  * These functions will decode JSON encoded netlink attributes into
@@ -349,24 +380,25 @@ int nljson_encode_nla_cb(nljson_t *hdl,
  * Decodes a JSON encoded string of nl attributes into the byte stream
  * nla_stream.
  *
- * @arg input             JSON encoded input string.
+ * @param[in] input              JSON encoded input string.
  *
- * @arg nla_stream        Output: stream of bytes containing netlink attributes
+ * @param[out] nla_stream        Output: stream of bytes containing netlink
+ *                               attributes
  *
- * @arg nla_stream_len    The length of the output buffer.
+ * @param[in] nla_stream_buf_len The length of the output buffer.
  *
- * @arg bytes_consumed    The number of bytes read (consumed) from
- *                        input.
+ * @param[out] bytes_consumed    The number of bytes read (consumed) from
+ *                               input.
  *
- * @arg bytes_produced    The number of output bytes produced, i.e. the
- *                        length of the nla_stream.
+ * @param[out] bytes_produced    The number of output bytes produced, i.e. the
+ *                               length of the nla_stream.
  *
- * @arg json_decode_flags Flags for the JSON input parsing.
- *                        Passed directly to the jansson library.
- *                        See jansson documentation for more info.
+ * @param[in] json_decode_flags  Flags for the JSON input parsing.
+ *                               Passed directly to the jansson library.
+ *                               See jansson documentation for more info.
  *
- * @arg error             Error output. The struct must be allocated by the
- *                        caller.
+ * @param[out] error             Error output. The struct must be allocated by
+ *                               the caller.
  *
  * @return 0 on success or -1 on error.
  *
@@ -385,20 +417,20 @@ int nljson_decode_nla(const char *input,
  * by the function and returned to the caller.
  * The caller is responsible for deallocating the buffer.
  *
- * @arg input             JSON encoded input string.
+ * @param[in] input             JSON encoded input string.
  *
- * @arg bytes_consumed    The number of bytes read (consumed) from
- *                        input.
+ * @param[out] bytes_consumed   The number of bytes read (consumed) from
+ *                              input.
  *
- * @arg bytes_produced    The number of output bytes produced, i.e. the
- *                        length of the nla_stream.
+ * @param[out] bytes_produced   The number of output bytes produced, i.e. the
+ *                              length of the nla_stream.
  *
- * @arg json_decode_flags Flags for the JSON input parsing.
- *                        Passed directly to the jansson library.
- *                        See jansson documentation for more info.
+ * @param[in] json_decode_flags Flags for the JSON input parsing.
+ *                              Passed directly to the jansson library.
+ *                              See jansson documentation for more info.
  *
- * @arg error             Error output. The struct must be allocated by the
- *                        caller.
+ * @param[out] error            Error output. The struct must be allocated by
+ *                              the caller.
  *
  * @return pointer to output buffer on success or NULL on error.
  *
@@ -415,22 +447,22 @@ void *nljson_decode_nla_alloc(const char *input,
  * Similar to nljson_decode_nla but the output is passed (in chunks)
  * to the callback decode_cb.
  *
- * @arg input             JSON encoded input string.
+ * @param[in] input             JSON encoded input string.
  *
- * @arg bytes_consumed    The number of bytes read (consumed) from
- *                        input.
+ * @param[out] bytes_consumed   The number of bytes read (consumed) from
+ *                              input.
  *
- * @arg decode_cb         will be called continuously when writing
- *                        the decoded nla output stream.
+ * @param[in] decode_cb         will be called continuously when writing
+ *                              the decoded nla output stream.
  *
- * @arg cb_data           pointer that will passed to decode_cb.
+ * @param[inout] cb_data        pointer that will passed to decode_cb.
  *
- * @arg json_decode_flags Flags for the JSON input parsing.
- *                        Passed directly to the jansson library.
- *                        See jansson documentation for more info.
+ * @param[in] json_decode_flags Flags for the JSON input parsing.
+ *                              Passed directly to the jansson library.
+ *                              See jansson documentation for more info.
  *
- * @arg error             Error output. The struct must be allocated by the
- *                        caller.
+ * @param[out] error            Error output. The struct must be allocated by
+ *                              the caller.
  *
  * @return 0 on success or -1 on error.
  *
@@ -444,6 +476,8 @@ int nljson_decode_nla_cb(const char *input,
 			 void *cb_data,
 			 uint32_t json_decode_flags,
 			 struct nljson_error *error);
+
+/** @} */
 
 #endif
 
