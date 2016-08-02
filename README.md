@@ -391,8 +391,8 @@ The JSON representation of my_policy used by nljson looks like this:
     },
     "ATTR_TYPE_3": {
         "data_type": "NLA_UNSPEC",
-        "nla_type": 102
-        "minlen": 4
+        "nla_type": 102,
+        "minlen": 4,
         "maxlen": 4
     }
 }
@@ -533,9 +533,14 @@ There is no limit for how deep the nesting can be.
 ## nljson library (libnljson)
 
 The library is documented in the API header: include/nljson.h
-Doxygen can be used to generate an API description if needed.
-I have chosen not to add a Doxyfile since it is so easily
-created by doxywizard anyway.
+Doxygen documentation can be generated like this:
+
+```sh
+cd docs
+doxygen
+```
+
+The doxygen output is stored in: docs/doxygen
 
 The nljson tools can also be used as an example of how to use the library.
 
