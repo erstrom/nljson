@@ -270,7 +270,7 @@ static struct nlattr *parse_json_attr(json_t *attr_json,
 		 * will use the length of the string.
 		 */
 		else if ((data_type == NLA_STRING) &&
-			 (attr_json_type = JSON_TYPE_STRING))
+			 (attr_json_type == JSON_TYPE_STRING))
 			attr_data_len = strlen(attr_value.str);
 	}
 
